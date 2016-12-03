@@ -29,7 +29,7 @@
 </tr>
 </tbody>
 </table>
-<p>本文主要介绍<em>flink</em>的核心组件以及物理计划的生成过程</p>
+<p>本文主要介绍<em>flink</em>的核心组件以及逻辑计划的生成过程</p>
 <p><em>参考代码分支 flink-1.1.2</em></p>
 <h2 id="核心组件介绍"><a href="#核心组件介绍" class="headerlink" title="核心组件介绍"></a>核心组件介绍</h2><p><em>这里只介绍 on yarn 模式下的组件</em></p>
 <p><em>flink</em> 的 on yarn 模式支持两种不同的类型：</p>
@@ -47,7 +47,7 @@
 <img src="/2016/12/03/Flink基本组件和逻辑计划/flink-on-yarn-arch.png" alt="flink on yarn" title="flink on yarn">
 <p>下面将以一次 Job 的提交过程描述 <em>flink</em> 的各组件的作用及协同</p>
 <h3 id="作业提交流程分析"><a href="#作业提交流程分析" class="headerlink" title="作业提交流程分析"></a>作业提交流程分析</h3><p>单作业单集群模式下，一个作业会启动一个 JM，并依据用户的参数传递启动相应数量的 TM，每个 TM 运行在 yarn 的一个 container 中，</p>
-<p>一个通常的 flink on yarn 提交命令：<code>./bin/flink run -m yarn-cluster -yn 2 -j flink-demo-1.0.0-with-dependencies.jar —ytm 1024 -yst 4 -yjm 1024 —yarnname flink_demo_waimai_e</code> <em>flink</em> 在收到这样一条命令后会首先通过 Cli 获取 flink 的配置，并解析命令行参数。</p>
+<p>一个通常的 flink on yarn 提交命令：<br><code>./bin/flink run -m yarn-cluster -yn 2 -j flink-demo-1.0.0-with-dependencies.jar —ytm 1024 -yst 4 -yjm 1024 —yarnname flink_demo_waimai_e</code><br><em>flink</em> 在收到这样一条命令后会首先通过 Cli 获取 flink 的配置，并解析命令行参数。</p>
 <h4 id="配置加载"><a href="#配置加载" class="headerlink" title="配置加载"></a>配置加载</h4><p><code>CliFrontend.java</code> 是 flink 提交作业的入口</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CliFrontend line144</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="title">CliFrontend</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   <span class="keyword">this</span>(getConfigurationDirectoryFromEnv());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
 <p>这里会尝试加载 conf 文件夹下的所有 yaml 文件，配置文件的命名并没有强制限制</p>
@@ -173,7 +173,7 @@
 <p><code>streamNode.getInputFormat()</code>是判断是否是数据源节点的逻辑，如果是数据源节点，这里会将用户代码【这里为 InputFormat.class 的子类】设置进 JobVertex 的配置中，并在 JobManager 执行提交作业命令的时候做初始化，会在 Flink 物理计划生成一节介绍。</p>
 <p><code>jobVertex.setInvokableClass</code>是设置运行时的执行类，通过这个类再调用用户定义的 operator，是 flink task 中真正被执行的类，具体会在 flink-task-runtime 一节中详细介绍。</p>
 <p>至此 JobGraph 生成，并扔给 JobManager 执行😝</p>
-</div><script type="text/javascript" src="/js/share.js?v=0.0.0" async></script><a data-url="https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/" data-id="ciw8si4fe00003as6s32he79r" class="article-share-link">分享到</a><div class="tags"><a href="/tags/Flink/">Flink</a></div><div id="disqus_thread"><script>var disqus_shortname = 'danny0405';
+</div><script type="text/javascript" src="/js/share.js?v=0.0.0" async></script><a data-url="https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/" data-id="ciw8tt3xk00009s9bu1caf9xm" class="article-share-link">分享到</a><div class="tags"><a href="/tags/Flink/">Flink</a></div><div id="disqus_thread"><script>var disqus_shortname = 'danny0405';
 var disqus_identifier = '2016/12/03/Flink基本组件和逻辑计划/';
 var disqus_title = 'Flink源码分析-基本组件和逻辑计划';
 var disqus_url = 'https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/';
