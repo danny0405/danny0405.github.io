@@ -136,7 +136,7 @@
     </entry>
     
     <entry>
-      <title><![CDATA[flik 基本组件和逻辑计划]]></title>
+      <title><![CDATA[flink 基本组件/逻辑计划]]></title>
       <url>https://danny0405.github.io/2016/12/03/Flink%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6%E5%92%8C%E9%80%BB%E8%BE%91%E8%AE%A1%E5%88%92/</url>
       <content type="html"><![CDATA[<h2 id="概要和背景"><a href="#概要和背景" class="headerlink" title="概要和背景"></a>概要和背景</h2><p><em>flink</em>是一个被誉为 <em>the 4th G</em> 的计算框架，不同的框架特性及其代表项目列表如下：</p>
 <table>
