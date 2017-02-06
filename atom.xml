@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://danny0405.github.io/"/>
-  <updated>2017-02-06T10:32:18.000Z</updated>
+  <updated>2017-02-06T10:52:19.000Z</updated>
   <id>https://danny0405.github.io/</id>
   
   <author>
@@ -20,7 +20,7 @@
     <link href="https://danny0405.github.io/2017/02/06/flink%E7%89%A9%E7%90%86%E8%AE%A1%E5%88%92%E7%94%9F%E6%88%90/"/>
     <id>https://danny0405.github.io/2017/02/06/flink物理计划生成/</id>
     <published>2017-02-06T09:12:21.000Z</published>
-    <updated>2017-02-06T10:32:18.000Z</updated>
+    <updated>2017-02-06T10:52:19.000Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>上一节讲到业务代码<code>StreamExecutionEnvironment.execute()</code>会触发job的客户端逻辑计划<code>JobGraph</code> 的生成，之后是客户端与<code>JobManager</code>的交互过程</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//ClusterClient line388</span></div><div class="line"><span class="function"><span class="keyword">public</span> JobExecutionResult <span class="title">run</span><span class="params">(JobGraph jobGraph, ClassLoader classLoader)</span> <span class="keyword">throws</span> ProgramInvocationException </span>&#123;</div><div class="line"></div><div class="line">   waitForClusterToBeReady();</div><div class="line"></div><div class="line">   <span class="keyword">final</span> LeaderRetrievalService leaderRetrievalService;</div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      leaderRetrievalService = LeaderRetrievalUtils.createLeaderRetrievalService(flinkConfig);</div><div class="line">   &#125; <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> ProgramInvocationException(<span class="string">"Could not create the leader retrieval service"</span>, e);</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      logAndSysout(<span class="string">"Submitting job with JobID: "</span> + jobGraph.getJobID() + <span class="string">". Waiting for job completion."</span>);</div><div class="line">      <span class="keyword">this</span>.lastJobExecutionResult = JobClient.submitJobAndWait(actorSystemLoader.get(),</div><div class="line">         leaderRetrievalService, jobGraph, timeout, printStatusDuringExecution, classLoader);</div><div class="line">      <span class="keyword">return</span> <span class="keyword">this</span>.lastJobExecutionResult;</div><div class="line">   &#125; <span class="keyword">catch</span> (JobExecutionException e) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> ProgramInvocationException(<span class="string">"The program execution failed: "</span> + e.getMessage(), e);</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
@@ -159,7 +159,7 @@
       <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
     
     
-      <category term="-Flink" scheme="https://danny0405.github.io/tags/Flink/"/>
+      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
     
   </entry>
   
@@ -168,7 +168,7 @@
     <link href="https://danny0405.github.io/2016/12/03/Flink%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6%E5%92%8C%E9%80%BB%E8%BE%91%E8%AE%A1%E5%88%92/"/>
     <id>https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/</id>
     <published>2016-12-03T03:59:30.000Z</published>
-    <updated>2017-02-06T10:32:34.000Z</updated>
+    <updated>2017-02-06T10:52:11.000Z</updated>
     
     <content type="html"><![CDATA[<h2 id="概要和背景"><a href="#概要和背景" class="headerlink" title="概要和背景"></a>概要和背景</h2><p><em>flink</em>是一个被誉为 <em>the 4th G</em> 的计算框架，不同的框架特性及其代表项目列表如下：</p>
 <table>
@@ -356,7 +356,7 @@
       <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
     
     
-      <category term="-Flink" scheme="https://danny0405.github.io/tags/Flink/"/>
+      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
     
   </entry>
   
