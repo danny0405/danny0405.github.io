@@ -1,0 +1,1127 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+  <meta name="google-site-verification" content="xQH1_363DDiHTPTlCBVkfWBilNX5dOtadRWvbWhVrIA" />
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="flink," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="玉兆的博客" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务">
+<meta property="og:type" content="article">
+<meta property="og:title" content="jobmanager 基本组件">
+<meta property="og:url" content="https://danny0405.github.io/2017/02/08/jobmanager基本组件/index.html">
+<meta property="og:site_name" content="玉兆的博客">
+<meta property="og:description" content="JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务">
+<meta property="og:image" content="https://danny0405.github.io/blob-server-store-dirctory-tree.png">
+<meta property="og:image" content="https://danny0405.github.io/blob-server-contact.png">
+<meta property="og:image" content="https://danny0405.github.io/blob-service-extends-arch.png">
+<meta property="og:image" content="https://danny0405.github.io/blob-server-cache-store.png">
+<meta property="og:image" content="https://danny0405.github.io/zk-state-handle-storage.png">
+<meta property="og:updated_time" content="2017-02-08T14:39:39.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="jobmanager 基本组件">
+<meta name="twitter:description" content="JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务">
+<meta name="twitter:image" content="https://danny0405.github.io/blob-server-store-dirctory-tree.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://danny0405.github.io/2017/02/08/jobmanager基本组件/"/>
+
+
+
+
+
+  <title> jobmanager 基本组件 | 玉兆的博客 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-88432446-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?1bde8b788c41c89cd3d082567500188c";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">玉兆的博客</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+    
+      <p class="site-subtitle">心如止水</p>
+    
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/08/jobmanager基本组件/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="chenyuzhao">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.png">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="玉兆的博客">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="玉兆的博客" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                jobmanager 基本组件
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-08T22:22:33+08:00">
+                2017-02-08
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Streaming/" itemprop="url" rel="index">
+                    <span itemprop="name">Streaming</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/08/jobmanager基本组件/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/02/08/jobmanager基本组件/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2017/02/08/jobmanager基本组件/" class="leancloud_visitors" data-flag-title="jobmanager 基本组件">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+              <div class="post-description">
+                  JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务
+              </div>
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务。</p>
+<h2 id="BolbServer"><a href="#BolbServer" class="headerlink" title="BolbServer"></a>BolbServer</h2><p>flink 用来管理二进制大文件的服务，flink JobManager 中启动的 BLOB Server 负责监听请求并派发线程去处理。更进一步，它将负责创建对应的目录结构去存储这些 BLOBs 或者只是临时性地缓存。背后支持的文件系统：本底磁盘</p>
+<p>来看它的构造器：</p>
+<ul>
+<li>第一步获取 RecoveryMode，一共两种 STANDALONE 和 ZOOKEEPER，后者是有 JobManager leader 选举的高可用模式</li>
+<li>获取文件系统存储的根目录，可配置，默认是从系统环境变量 <code>System.getProperty(&quot;java.io.tmpdir&quot;)</code> 中获取，其实就是本次磁盘存储</li>
+<li>初始化 <em>恢复存储</em> 模块 BolbStore，STANDALONE 模式下为 VoidBlobStore，VoidBlobStore 是一个空实现；不会有任何持久化操作；ZOOKEEPER 模式下为 FileSystemBlobStore，FileSystemBlobStore 内部封装了磁盘文件的管理，包括添加、删除、拷贝等，BlogStore 会备份 BlobServer 的本地存储，主要用于恢复模式下的作业磁盘状态恢复用</li>
+<li>启动 ServerSocket</li>
+<li>启动 BlobServer 服务线程</li>
+</ul>
+<h3 id="BlogServer-和-BlobStore"><a href="#BlogServer-和-BlobStore" class="headerlink" title="BlogServer 和 BlobStore"></a>BlogServer 和 BlobStore</h3><p>BlobStore 是 BlobServer 的组件之一，BolbStore 主要负责 BlobServer 本地存储的恢复【JobManager 重启】，这里只介绍 FileSystemBlobStore，FileSystemBlobStore 依据配置的不同支持两种文件系统存储：HDFS 和 本地文件系统</p>
+<p>BlobServer 和  FileSystemBlobStore 的存储目录结构如下图所示：</p>
+<p><img src="blob-server-store-dirctory-tree.png" alt="blob-server-store-dirctory-tree.png"></p>
+<p><em>下面以一次客户端连接请求的发起介绍两者的协同</em></p>
+<p>来看 BolbServer 的核心 <code>run</code> 方法:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BlobServer line230</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      <span class="keyword">while</span> (!<span class="keyword">this</span>.shutdownRequested.get()) &#123;</div><div class="line">         BlobServerConnection conn = <span class="keyword">new</span> BlobServerConnection(serverSocket.accept(), <span class="keyword">this</span>);</div><div class="line">         <span class="keyword">try</span> &#123;</div><div class="line">            <span class="keyword">synchronized</span> (activeConnections) &#123;</div><div class="line">               <span class="keyword">while</span> (activeConnections.size() &gt;= maxConnections) &#123;</div><div class="line">                  activeConnections.wait(<span class="number">2000</span>);</div><div class="line">               &#125;</div><div class="line">               activeConnections.add(conn);</div><div class="line">            &#125;</div><div class="line"></div><div class="line">            conn.start();</div><div class="line">            conn = <span class="keyword">null</span>;</div><div class="line">         &#125;</div><div class="line">         <span class="keyword">finally</span> &#123;</div><div class="line">            <span class="keyword">if</span> (conn != <span class="keyword">null</span>) &#123;</div><div class="line">               conn.close();</div><div class="line">               <span class="keyword">synchronized</span> (activeConnections) &#123;</div><div class="line">                  activeConnections.remove(conn);</div><div class="line">               &#125;</div><div class="line">            &#125;</div><div class="line">         &#125;</div><div class="line">      &#125;</div><div class="line">   &#125;</div></pre></td></tr></table></figure>
+<p>简要概括下逻辑：</p>
+<ul>
+<li>当服务端收到一次存储的 request 时，会首先封装成对象 BlobServerConnection，并执行其 <code>start()</code> 方法</li>
+<li>BlobServerConnection 本身也是一个 Thread，封装了具体的存储逻辑</li>
+<li>会接收 3 种客户端请求：PUT/GET/DELETE，具体见：</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BlobServerConnection line111</span></div><div class="line"><span class="keyword">switch</span> (operation) &#123;</div><div class="line"><span class="keyword">case</span> PUT_OPERATION:</div><div class="line">   put(inputStream, outputStream, buffer);</div><div class="line">   <span class="keyword">break</span>;</div><div class="line"><span class="keyword">case</span> GET_OPERATION:</div><div class="line">   get(inputStream, outputStream, buffer);</div><div class="line">   <span class="keyword">break</span>;</div><div class="line"><span class="keyword">case</span> DELETE_OPERATION:</div><div class="line">   delete(inputStream, outputStream, buffer);</div><div class="line">   <span class="keyword">break</span>;</div><div class="line"><span class="keyword">default</span>:</div><div class="line">   <span class="keyword">throw</span> <span class="keyword">new</span> IOException(<span class="string">"Unknown operation "</span> + operation);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p><em>这里重点介绍下 PUT 操作</em></p>
+<ul>
+<li>获取本次存储操作是否带 JobID</li>
+<li>在 BlobServer 的本地 incoming 文件夹中生成临时文件：temp-[auto increment integer]</li>
+<li>读取将要存储的字节长度</li>
+<li>读取该长度字节存储到临时文件 temp-[auto increment integer]</li>
+<li>如果带 JobID，会将临时文件移动到 JobID 对应的存储目录，并将该存储文件在 BlobStore 的对应 JobID恢复目录中备份，写 OK 消息到 Socket Client 端，最终生成的路径和文件： job-id/blob_[base64 encode key]</li>
+<li>如果不带 JobID，则依据传递的消息字节数组生成一个 key：BlogKey，并存储在 cache 文件夹下，同时在 BlobStore 的 cache 文件夹下做备份，将 OK 消息和 BlobKey 写回 Socket Client，最终生成的路径和文件：cache/blob_[unique hex string]</li>
+</ul>
+<h3 id="BlobServer-交互协议"><a href="#BlobServer-交互协议" class="headerlink" title="BlobServer 交互协议"></a>BlobServer 交互协议</h3><p>与 BlobServer 通信的消息协议包括四段：操作类型【PUT/GET/DELETE】、存储类型【是否带 JobID】、内容长度、内容，如下图所示：</p>
+<p><img src="blob-server-contact.png" alt="blob-server-contact.png"></p>
+<p><em>到这里 BlobServer 就介绍完了</em></p>
+<h2 id="InstanceManager"><a href="#InstanceManager" class="headerlink" title="InstanceManager"></a>InstanceManager</h2><p>flink 用来追踪当前存活的 TaskManager 的管理组件，实现比较简单，这里只简单罗列下其功能：</p>
+<ul>
+<li>book 下载 JobManager 中注册的所有 TaskManager</li>
+<li>负责更新从 TaskManager 中上报的心跳及 metrics 信息</li>
+<li>通知 InstanceListener TaskManager 的增加与死亡</li>
+</ul>
+<h2 id="BlobLibraryCacheManager"><a href="#BlobLibraryCacheManager" class="headerlink" title="BlobLibraryCacheManager"></a>BlobLibraryCacheManager</h2><p>flink job 的 jar 包存储服务，使用上面的 BlobServer 完成，一个 JVM 里只会存在一个 BlobLibraryCacheManager，BlobLibraryCacheManager 负责管理 BlobService【这里为BlobServer】 中存储的 jars，并存储运行时 task 对 BlobService 中 jars 的引用计数，会清理不被使用任何 task 使用的 jars。</p>
+<p><em>BlobCache 负责 jars 的下载，介绍 TaskManager 的时候会详细介绍</em></p>
+<p>BlobLibraryCacheManager 与 BlobService 交互，而 BlobService 负责具体的文件管理，其具体实现有两个：BlobServer 和 BlobCache，具体见下图：</p>
+<p><img src="blob-service-extends-arch.png" alt="blob-service-extends-arch.png"></p>
+<p>BlobServer 前面已经介绍过了，那么 BlobCache 的功能是什么呢？</p>
+<p>来看 BlobCache 的构造器：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BlobCache line60</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="title">BlobCache</span><span class="params">(InetSocketAddress serverAddress, Configuration configuration)</span> </span>&#123;</div><div class="line">   <span class="keyword">if</span> (serverAddress == <span class="keyword">null</span> || configuration == <span class="keyword">null</span>) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> NullPointerException();</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   <span class="keyword">this</span>.serverAddress = serverAddress;</div><div class="line"></div><div class="line">   <span class="comment">// configure and create the storage directory</span></div><div class="line">   String storageDirectory = configuration.getString(ConfigConstants.BLOB_STORAGE_DIRECTORY_KEY, <span class="keyword">null</span>);</div><div class="line">   <span class="keyword">this</span>.storageDir = BlobUtils.initStorageDirectory(storageDirectory);</div><div class="line">   LOG.info(<span class="string">"Created BLOB cache storage directory "</span> + storageDir);</div></pre></td></tr></table></figure>
+<p>这里传入的 serverAddress 其实是 BlobServer 的服务端口，在 TaskManager 中可以看到：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// start a blob service, if a blob server is specified TaskManager line940</span></div><div class="line"><span class="keyword">if</span> (blobPort &gt; <span class="number">0</span>) &#123;</div><div class="line">  val jmHost = jobManager.path.address.host.getOrElse(<span class="string">"localhost"</span>)</div><div class="line">  val address = <span class="keyword">new</span> InetSocketAddress(jmHost, blobPort)</div><div class="line"></div><div class="line">  log.info(s<span class="string">"Determined BLOB server address to be $address. Starting BLOB cache."</span>)</div><div class="line"></div><div class="line">  <span class="keyword">try</span> &#123;</div><div class="line">    val blobcache = <span class="keyword">new</span> BlobCache(address, config.configuration)</div><div class="line">    blobService = Option(blobcache)</div><div class="line">    libraryCacheManager = Some(<span class="keyword">new</span> BlobLibraryCacheManager(blobcache, config.cleanupInterval))</div><div class="line">  &#125;</div></pre></td></tr></table></figure>
+<p>来看 BlobCache 的核心服务方法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BlobCache line97</span></div><div class="line"><span class="function"><span class="keyword">public</span> URL <span class="title">getURL</span><span class="params">(<span class="keyword">final</span> BlobKey requiredBlob)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">   <span class="keyword">if</span> (requiredBlob == <span class="keyword">null</span>) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"BLOB key cannot be null."</span>);</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   <span class="keyword">final</span> File localJarFile = BlobUtils.getStorageLocation(storageDir, requiredBlob);</div><div class="line"></div><div class="line">   <span class="keyword">if</span> (!localJarFile.exists()) &#123;</div><div class="line"></div><div class="line">      <span class="keyword">final</span> <span class="keyword">byte</span>[] buf = <span class="keyword">new</span> <span class="keyword">byte</span>[BlobServerProtocol.BUFFER_SIZE];</div><div class="line"></div><div class="line">      <span class="comment">// loop over retries</span></div><div class="line">      <span class="keyword">int</span> attempt = <span class="number">0</span>;</div><div class="line">      <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line"></div><div class="line">         <span class="keyword">if</span> (attempt == <span class="number">0</span>) &#123;</div><div class="line">            LOG.info(<span class="string">"Downloading &#123;&#125; from &#123;&#125;"</span>, requiredBlob, serverAddress);</div><div class="line">         &#125; <span class="keyword">else</span> &#123;</div><div class="line">            LOG.info(<span class="string">"Downloading &#123;&#125; from &#123;&#125; (retry &#123;&#125;)"</span>, requiredBlob, serverAddress, attempt);</div><div class="line">         &#125;</div><div class="line"></div><div class="line">         <span class="keyword">try</span> &#123;</div><div class="line">            BlobClient bc = <span class="keyword">null</span>;</div><div class="line">            InputStream is = <span class="keyword">null</span>;</div><div class="line">            OutputStream os = <span class="keyword">null</span>;</div><div class="line"></div><div class="line">            <span class="keyword">try</span> &#123;</div><div class="line">               bc = <span class="keyword">new</span> BlobClient(serverAddress);</div><div class="line">               is = bc.get(requiredBlob);</div><div class="line">               os = <span class="keyword">new</span> FileOutputStream(localJarFile);</div><div class="line"></div><div class="line">               <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">                  <span class="keyword">final</span> <span class="keyword">int</span> read = is.read(buf);</div><div class="line">                  <span class="keyword">if</span> (read &lt; <span class="number">0</span>) &#123;</div><div class="line">                     <span class="keyword">break</span>;</div><div class="line">                  &#125;</div><div class="line">                  os.write(buf, <span class="number">0</span>, read);</div><div class="line">               &#125;</div><div class="line"></div><div class="line">               <span class="comment">// we do explicitly not use a finally block, because we want the closing</span></div><div class="line">               <span class="comment">// in the regular case to throw exceptions and cause the writing to fail.</span></div><div class="line">               <span class="comment">// But, the closing on exception should not throw further exceptions and</span></div><div class="line">               <span class="comment">// let us keep the root exception</span></div><div class="line">               os.close();</div><div class="line">               os = <span class="keyword">null</span>;</div><div class="line">               is.close();</div><div class="line">               is = <span class="keyword">null</span>;</div><div class="line">               bc.close();</div><div class="line">               bc = <span class="keyword">null</span>;</div><div class="line"></div><div class="line">               <span class="comment">// success, we finished</span></div><div class="line">               <span class="keyword">break</span>;</div></pre></td></tr></table></figure>
+<p>简要概括下其逻辑：</p>
+<ul>
+<li>先从本地磁盘中获取，如果存在，直接返回</li>
+<li>如果没有，生成 BlobClient 与 BlobServer 交互，并拉取文件到本地缓存，后返回本地缓存的文件句柄</li>
+</ul>
+<p>从这里我们可以看到 BlobCache 是 TaskManager 操作本地文件的工具，它负责从 JobManager 中的 BlobServer 同步所需的文件【jar包等】，而 BlobServer 和 BlobCache 的文件管理的入口，统一由对应 JVM 中的 BlobLibraryCacheManager 来控制【没有任务使用的 jar 定期清除等】。</p>
+<p>task 拉取 jar包文件的过程如下：</p>
+<p><img src="blob-server-cache-store.png" alt="blob-server-cache-store.png"></p>
+<h2 id="ZooKeeperCompletedCheckpointStore"><a href="#ZooKeeperCompletedCheckpointStore" class="headerlink" title="ZooKeeperCompletedCheckpointStore"></a>ZooKeeperCompletedCheckpointStore</h2><p>flink 做 checkpoint 【有关 checkpoint 会另起一节介绍】存储的组件，负责存储已完成的 Checkpoint ，实现了接口 CompletedCheckpointStore，StandaloneCompletedCheckpointStore 和 ZooKeeperCompletedCheckpointStore 都实现了 CompletedCheckpointStore 接口，前者只在内存里存储 checkpoint，这里只介绍 ZooKeeperCompletedCheckpointStore 的实现。</p>
+<p>ZooKeeperCompletedCheckpointStore 存储 checkpoint 的基本思路：</p>
+<ul>
+<li>先在本地磁盘持久化指定数量的 checkpoint</li>
+<li>将文件句柄更新到 ZK 的特定节点下</li>
+<li>滑动更新 zk 的节点存储</li>
+<li>在恢复的时候只取最近一次的更新值</li>
+</ul>
+<p>先来看下  ZooKeeperCompletedCheckpointStore 用来和 ZK 存储交互的组件：ZooKeeperStateHandleStore，来看它的核心添加 state 的方法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//ZooKeeperStateHandleStore line117</span></div><div class="line"><span class="function"><span class="keyword">public</span> StateHandle&lt;T&gt; <span class="title">add</span><span class="params">(</span></span></div><div class="line">      String pathInZooKeeper,</div><div class="line">      T state,</div><div class="line">      CreateMode createMode) <span class="keyword">throws</span> Exception &#123;</div><div class="line">   checkNotNull(pathInZooKeeper, <span class="string">"Path in ZooKeeper"</span>);</div><div class="line">   checkNotNull(state, <span class="string">"State"</span>);</div><div class="line"></div><div class="line">   StateHandle&lt;T&gt; stateHandle = storage.store(state);</div><div class="line"></div><div class="line">   <span class="keyword">boolean</span> success = <span class="keyword">false</span>;</div><div class="line"></div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      <span class="comment">// Serialize the state handle. This writes the state to the backend.</span></div><div class="line">      <span class="keyword">byte</span>[] serializedStateHandle = InstantiationUtil.serializeObject(stateHandle);</div><div class="line"></div><div class="line">      <span class="comment">// Write state handle (not the actual state) to ZooKeeper. This is expected to be</span></div><div class="line">      <span class="comment">// smaller than the state itself. This level of indirection makes sure that data in</span></div><div class="line">      <span class="comment">// ZooKeeper is small, because ZooKeeper is designed for data in the KB range, but</span></div><div class="line">      <span class="comment">// the state can be larger.</span></div><div class="line">      client.create().withMode(createMode).forPath(pathInZooKeeper, serializedStateHandle);</div><div class="line"></div><div class="line">      success = <span class="keyword">true</span>;</div><div class="line"></div><div class="line">      <span class="keyword">return</span> stateHandle;</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">finally</span> &#123;</div><div class="line">      <span class="keyword">if</span> (!success) &#123;</div><div class="line">         <span class="comment">// Cleanup the state handle if it was not written to ZooKeeper.</span></div><div class="line">         <span class="keyword">if</span> (stateHandle != <span class="keyword">null</span>) &#123;</div><div class="line">            stateHandle.discardState();</div><div class="line">         &#125;</div><div class="line">      &#125;</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>简要概括其逻辑：</p>
+<ul>
+<li>使用 StateStorageHelper 存储 state，ZK 模式下为 FileSystemStateStorageHelper，方式为直接存储到本地磁盘</li>
+<li>将 state 的句柄对象 StateHandle 序列化并持久化到 ZK 的节点</li>
+</ul>
+<p>其在 zk 上的存储路径如下图所示：</p>
+<p><img src="zk-state-handle-storage.png" width="300" height="300" alt="zk-state-handle-storage.png" align="center"></p>
+<p>现在来看 ZooKeeperCompletedCheckpointStore 的核心功能：添加 checkpoint 和 从 checkpoint 做 recovery</p>
+<h3 id="添加-checkpoint"><a href="#添加-checkpoint" class="headerlink" title="添加 checkpoint"></a>添加 checkpoint</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//ZooKeeperCompletedCheckpointStore line190</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">addCheckpoint</span><span class="params">(CompletedCheckpoint checkpoint)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   checkNotNull(checkpoint, <span class="string">"Checkpoint"</span>);</div><div class="line"></div><div class="line">   <span class="comment">// First add the new one. If it fails, we don't want to loose existing data.</span></div><div class="line">   String path = String.format(<span class="string">"/%s"</span>, checkpoint.getCheckpointID());</div><div class="line"></div><div class="line">   <span class="keyword">final</span> StateHandle&lt;CompletedCheckpoint&gt; stateHandle = checkpointsInZooKeeper.add(path, checkpoint);</div><div class="line"></div><div class="line">   checkpointStateHandles.addLast(<span class="keyword">new</span> Tuple2&lt;&gt;(stateHandle, path));</div><div class="line"></div><div class="line">   <span class="comment">// Everything worked, let's remove a previous checkpoint if necessary.</span></div><div class="line">   <span class="keyword">if</span> (checkpointStateHandles.size() &gt; maxNumberOfCheckpointsToRetain) &#123;</div><div class="line">      removeFromZooKeeperAndDiscardCheckpoint(checkpointStateHandles.removeFirst());</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   LOG.debug(<span class="string">"Added &#123;&#125; to &#123;&#125;."</span>, checkpoint, path);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>简要概括其逻辑：</p>
+<ul>
+<li>在本地磁盘存储该 checkpoint 的内容并返回句柄对象：StateHandle</li>
+<li>以 checkpoint id 在 zk 上新建一个 node，并存储对应的序列化后的 StateHandle</li>
+<li>检查存储的 checkpoint 个数是否超过限制，如果超过，删除本地磁盘及zk上最旧的数据</li>
+<li>如果添加失败，已有的 checkpoint 数据不会受影响，这里 flink 想最大化保留作业的 checkpoint</li>
+</ul>
+<h3 id="从-checkpoint-中恢复"><a href="#从-checkpoint-中恢复" class="headerlink" title="从 checkpoint 中恢复"></a>从 checkpoint 中恢复</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//ZooKeeperCompletedCheckpointStore line137</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">recover</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   LOG.info(<span class="string">"Recovering checkpoints from ZooKeeper."</span>);</div><div class="line"></div><div class="line">   <span class="comment">// Clear local handles in order to prevent duplicates on</span></div><div class="line">   <span class="comment">// recovery. The local handles should reflect the state</span></div><div class="line">   <span class="comment">// of ZooKeeper.</span></div><div class="line">   checkpointStateHandles.clear();</div><div class="line"></div><div class="line">   <span class="comment">// Get all there is first</span></div><div class="line">   List&lt;Tuple2&lt;StateHandle&lt;CompletedCheckpoint&gt;, String&gt;&gt; initialCheckpoints;</div><div class="line">   <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">      <span class="keyword">try</span> &#123;</div><div class="line">         initialCheckpoints = checkpointsInZooKeeper.getAllSortedByName();</div><div class="line">         <span class="keyword">break</span>;</div><div class="line">      &#125;</div><div class="line">      <span class="keyword">catch</span> (ConcurrentModificationException e) &#123;</div><div class="line">         LOG.warn(<span class="string">"Concurrent modification while reading from ZooKeeper. Retrying."</span>);</div><div class="line">      &#125;</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   <span class="keyword">int</span> numberOfInitialCheckpoints = initialCheckpoints.size();</div><div class="line"></div><div class="line">   LOG.info(<span class="string">"Found &#123;&#125; checkpoints in ZooKeeper."</span>, numberOfInitialCheckpoints);</div><div class="line"></div><div class="line">   <span class="keyword">if</span> (numberOfInitialCheckpoints &gt; <span class="number">0</span>) &#123;</div><div class="line">      <span class="comment">// Take the last one. This is the latest checkpoints, because path names are strictly</span></div><div class="line">      <span class="comment">// increasing (checkpoint ID).</span></div><div class="line">      Tuple2&lt;StateHandle&lt;CompletedCheckpoint&gt;, String&gt; latest = initialCheckpoints</div><div class="line">            .get(numberOfInitialCheckpoints - <span class="number">1</span>);</div><div class="line"></div><div class="line">      CompletedCheckpoint latestCheckpoint = latest.f0.getState(userClassLoader);</div><div class="line"></div><div class="line">      checkpointStateHandles.add(latest);</div><div class="line"></div><div class="line">      LOG.info(<span class="string">"Initialized with &#123;&#125;. Removing all older checkpoints."</span>, latestCheckpoint);</div><div class="line"></div><div class="line">      <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; numberOfInitialCheckpoints - <span class="number">1</span>; i++) &#123;</div><div class="line">         <span class="keyword">try</span> &#123;</div><div class="line">            removeFromZooKeeperAndDiscardCheckpoint(initialCheckpoints.get(i));</div><div class="line">         &#125;</div><div class="line">         <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">            LOG.error(<span class="string">"Failed to discard checkpoint"</span>, e);</div><div class="line">         &#125;</div><div class="line">      &#125;</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>简要概括其逻辑：</p>
+<ul>
+<li>清除内存中维护的句柄对象 StateHandle s</li>
+<li>从 ZK 上拉取作业对应的所有的 checkpoint StateHandle 节点，并排序【从小到大】</li>
+<li>获取最新的一次快照并从本地磁盘恢复 checkpoint</li>
+<li>删除其余所有的 checkpoint 信息【ZK 和本地磁盘】</li>
+</ul>
+<p>ZooKeeperCompletedCheckpointStore 由 ZooKeeperCheckpointRecoveryFactory 负责实例化，一个 Job 会实例化一个 ZooKeeperCompletedCheckpointStore 负责快照。这里存储的只是个节点快照的句柄，并不是真正的状态数据。</p>
+<p>具体的启动流程见 JobManager</p>
+<p><code>line1208 val completedCheckpoints = checkpointRecoveryFactory.createCheckpointStore(jobId, userCodeLoader)</code></p>
+<p><code>line1238 executionGraph.enableSnapshotCheckpointing</code></p>
+<p>到这里 JobManager 的核心组件基本就介绍结束了😄</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>生活不止眼前的苟且！</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/wechat-reward-image.png" alt="chenyuzhao WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/flink/" rel="tag"># flink</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/02/06/flink物理计划生成/" rel="next" title="flink 物理计划生成">
+                <i class="fa fa-chevron-left"></i> flink 物理计划生成
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/02/08/flink算子的生命周期/" rel="prev" title="flink 算子的生命周期">
+                flink 算子的生命周期 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+          
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="chenyuzhao" />
+          <p class="site-author-name" itemprop="name">chenyuzhao</p>
+          <p class="site-description motion-element" itemprop="description">本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~</p>
+        </div>
+        <nav class="site-state motion-element">
+        
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">4</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#BolbServer"><span class="nav-number">2.</span> <span class="nav-text">BolbServer</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#BlogServer-和-BlobStore"><span class="nav-number">2.1.</span> <span class="nav-text">BlogServer 和 BlobStore</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BlobServer-交互协议"><span class="nav-number">2.2.</span> <span class="nav-text">BlobServer 交互协议</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#InstanceManager"><span class="nav-number">3.</span> <span class="nav-text">InstanceManager</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#BlobLibraryCacheManager"><span class="nav-number">4.</span> <span class="nav-text">BlobLibraryCacheManager</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ZooKeeperCompletedCheckpointStore"><span class="nav-number">5.</span> <span class="nav-text">ZooKeeperCompletedCheckpointStore</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#添加-checkpoint"><span class="nav-number">5.1.</span> <span class="nav-text">添加 checkpoint</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#从-checkpoint-中恢复"><span class="nav-number">5.2.</span> <span class="nav-text">从 checkpoint 中恢复</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenyuzhao</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+
+  
+
+    <script type="text/javascript">
+      var disqus_shortname = 'danny0405';
+      var disqus_identifier = '2017/02/08/jobmanager基本组件/';
+
+      var disqus_title = "jobmanager 基本组件";
+
+
+      function run_disqus_script(disqus_script) {
+        var dsq = document.createElement('script');
+        dsq.type = 'text/javascript';
+        dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      }
+
+      run_disqus_script('count.js');
+
+      
+        var disqus_config = function () {
+            this.page.url = disqus_url;
+            this.page.identifier = disqus_identifier;
+            this.page.title = disqus_title;
+        };
+        run_disqus_script('embed.js');
+      
+
+    </script>
+  
+
+
+
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("IHwwV5iwSmi4anND94SPVRfX-gzGzoHsz", "HA0GffL0nVFkTaYDd2HVvyyN");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+
+</body>
+</html>

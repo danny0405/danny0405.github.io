@@ -3,6 +3,46 @@
 
 
     
+  <url>
+    <loc>https://danny0405.github.io/2017/02/08/flink%E7%AE%97%E5%AD%90%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/</loc>
+    <lastmod>2017-02-08T14:41:28.000Z</lastmod>
+    <data>
+        <display>
+        <title>flink 算子的生命周期</title>
+        <pubTime>2017-02-08T14:35:36.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+         
+           
+             
+              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/02/08/jobmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/</loc>
+    <lastmod>2017-02-08T14:39:39.000Z</lastmod>
+    <data>
+        <display>
+        <title>jobmanager 基本组件</title>
+        <pubTime>2017-02-08T14:22:33.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+         
+           
+             
+              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
     
     
   <url>
