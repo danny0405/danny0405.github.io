@@ -99,7 +99,8 @@
 <meta property="og:image" content="https://danny0405.github.io/2017/02/06/flink物理计划生成/job-graph-node-sort.png">
 <meta property="og:image" content="https://danny0405.github.io/2017/02/06/flink物理计划生成/execution-vertex-one-to-one.png">
 <meta property="og:image" content="https://danny0405.github.io/2017/02/06/flink物理计划生成/execution-one-many.png">
-<meta property="og:updated_time" content="2017-02-06T10:52:19.000Z">
+<meta property="og:image" content="https://danny0405.github.io/2017/02/06/flink物理计划生成/execution-many-one.png">
+<meta property="og:updated_time" content="2017-02-09T14:11:31.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="flink 物理计划生成">
 <meta name="twitter:description" content="flink 物理计划生成，主要是 JobManager 运行时的抽象和管理，前一章节中有介绍过 flink 的逻辑计划抽象，在运行时，flink 进一步将逻辑计划抽象成与执行节点信息紧密相关的物理计划，来对作业的调度、执行进行管理">
@@ -548,7 +549,7 @@
 <p>如果 partition 数小于 并发数 ，子 task 只会连接一个上游 partition，具体关系如下图：</p>
 <img src="/2017/02/06/flink物理计划生成/execution-one-many.png" alt="execution-one-many.png" title="execution-one-many.png">
 <p>如果 partition 数大于并发数，子 task 会连接多个上游 partition，具体见下图：</p>
-<p>execution-many-one.png](execution-many-one.png)</p>
+<img src="/2017/02/06/flink物理计划生成/execution-many-one.png" alt="execution-many-one.png" title="execution-many-one.png">
 <p>到这里运行时执行计划 ExecutionGraph 的生成就介绍完了😄下节将先介绍 JobManager 的核心组件</p>
 
       

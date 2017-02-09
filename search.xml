@@ -948,7 +948,7 @@
 <p>如果 partition 数小于 并发数 ，子 task 只会连接一个上游 partition，具体关系如下图：</p>
 <img src="/2017/02/06/flink物理计划生成/execution-one-many.png" alt="execution-one-many.png" title="execution-one-many.png">
 <p>如果 partition 数大于并发数，子 task 会连接多个上游 partition，具体见下图：</p>
-<p>execution-many-one.png](execution-many-one.png)</p>
+<img src="/2017/02/06/flink物理计划生成/execution-many-one.png" alt="execution-many-one.png" title="execution-many-one.png">
 <p>到这里运行时执行计划 ExecutionGraph 的生成就介绍完了😄下节将先介绍 JobManager 的核心组件</p>
 ]]></content>
     </entry>
