@@ -4,6 +4,26 @@
 
     
   <url>
+    <loc>https://danny0405.github.io/2017/02/09/flink%E7%BD%91%E7%BB%9C%E6%A0%88/</loc>
+    <lastmod>2017-02-09T10:03:25.000Z</lastmod>
+    <data>
+        <display>
+        <title>flink 网络栈</title>
+        <pubTime>2017-02-09T05:38:48.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+         
+           
+             
+              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
     <loc>https://danny0405.github.io/2017/02/09/flink%E5%AF%B9%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/</loc>
     <lastmod>2017-02-09T05:56:14.000Z</lastmod>
     <data>
@@ -56,26 +76,6 @@
         <tag>watermark</tag>
          
         <tag>checkpoint</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/09/flink%E7%BD%91%E7%BB%9C%E6%A0%88/</loc>
-    <lastmod>2017-02-09T05:41:18.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink 网络栈</title>
-        <pubTime>2017-02-09T05:38:48.000Z</pubTime>
-        
-        <tag>flink</tag>
          
          
            
