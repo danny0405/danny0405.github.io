@@ -1,0 +1,1275 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+  <meta name="google-site-verification" content="xQH1_363DDiHTPTlCBVkfWBilNX5dOtadRWvbWhVrIA" />
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="flink," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="玉兆的博客" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理">
+<meta property="og:type" content="article">
+<meta property="og:title" content="flink 网络栈">
+<meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink网络栈/index.html">
+<meta property="og:site_name" content="玉兆的博客">
+<meta property="og:description" content="本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理">
+<meta property="og:image" content="https://danny0405.github.io/intermediate-result.png">
+<meta property="og:image" content="https://danny0405.github.io/sub-partition.png">
+<meta property="og:image" content="https://danny0405.github.io/flink-network-dataflow.png">
+<meta property="og:image" content="https://danny0405.github.io/netty-client-server.png">
+<meta property="og:updated_time" content="2017-02-09T05:41:18.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="flink 网络栈">
+<meta name="twitter:description" content="本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理">
+<meta name="twitter:image" content="https://danny0405.github.io/intermediate-result.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://danny0405.github.io/2017/02/09/flink网络栈/"/>
+
+
+
+
+
+  <title> flink 网络栈 | 玉兆的博客 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-88432446-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?1bde8b788c41c89cd3d082567500188c";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">玉兆的博客</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+    
+      <p class="site-subtitle">心如止水</p>
+    
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/09/flink网络栈/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="chenyuzhao">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.png">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="玉兆的博客">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="玉兆的博客" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                flink 网络栈
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-09T13:38:48+08:00">
+                2017-02-09
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Streaming/" itemprop="url" rel="index">
+                    <span itemprop="name">Streaming</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/09/flink网络栈/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/02/09/flink网络栈/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2017/02/09/flink网络栈/" class="leancloud_visitors" data-flag-title="flink 网络栈">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+              <div class="post-description">
+                  本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理
+              </div>
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理</p>
+<p><em>我们会从 flink 网络相关的核心抽象开始介绍</em></p>
+<h2 id="IntermediateResult"><a href="#IntermediateResult" class="headerlink" title="IntermediateResult"></a>IntermediateResult</h2><p>代表一个 Job Vertex 的中间执行结果，由于同一个 Job vertex 可能有多个线程并发执行，这里的 IntermediateResult 对应一个 Job Edge 的输出下游结果集，一个 IntermediateResult 包含多个 IntermediateResultPartition，一个 IntermediateResultPartition 对应一个并行任务 ExecutionVertex 的输出结果，如下图所示：</p>
+<p><img src="intermediate-result.png" alt="intermediate-result.png"> <em>对应关系如下</em>：</p>
+<ul>
+<li>IntermediateDataSet [StreamGraph] &lt;-&gt; IntermediateResult[JobGraph]  代表一个 dataset</li>
+<li>IntermediateResultPartition [ExecutionGraph] 代表一个并行任务的输出 partition </li>
+<li>ResultPartition 代表一个  IntermediateResultPartition 的生产者 ExecutionVertex 的输出 副本，可输出多个副本</li>
+<li>一个 ResultPartition 可能包含多个 ResultSubPartition【依据下游消费 task 的数目】</li>
+</ul>
+<p>下面介绍数据的消费*</p>
+<h2 id="InputGate"><a href="#InputGate" class="headerlink" title="InputGate"></a>InputGate</h2><p>InputGate 是 flink 关于 task 的一个输入源的抽象，一个 InputGate 代表一个上游数据源，对应<strong>一个</strong>上游中间结果的一个或多个 partition</p>
+<p>flink 依据中间结果的 producer 【<em>生产task</em>】的并发度来生成相应个数的 partition，每个 producer task 生产一个 partition，为了优化并发读写，flink 依据中间结果的消费者 task 的并发度进一步将每个 partition 划分为多个 subPartition，假设有如下这样的一个简单地生产消费模型：</p>
+<p><img src="sub-partition.png" alt="sub-partition.png"></p>
+<p>上图的模型包含了一个生产者任务 map() 和消费者任务 reduce()，两者的并行度都是 2，由于有两个 producer task，这时候 flink 会将中间结果划分为两个 partition，同时由于有 2 个 consumer task，每个 partition被进一步划分为两个 sub partiton</p>
+<p>对于每个 consumer task，flink 会维护一个消费的中间数据集和 task 本身的对应关系，这就是 InputGate</p>
+<p>每个 InputGate 会维护消费一个中间结果的每个partition中的一个 subPartition，这样的一个 subPartition 的消费需要建立一个 InputChannel</p>
+<p>ps: 目前 flink 的一个中间结果 partition 仅支持一个 consumer 节点【JobVertex】</p>
+<h3 id="InputGate的创建"><a href="#InputGate的创建" class="headerlink" title="InputGate的创建"></a>InputGate的创建</h3><p>在上一节 Flink 算子的声明周期一节，我们介绍了 Flink 的 Instance 直接执行类 Task.java，在其构造器中有这样一段逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// Consumed intermediate result partitions</span></div><div class="line">		<span class="keyword">this</span>.inputGates = <span class="keyword">new</span> SingleInputGate[consumedPartitions.size()];</div><div class="line">		<span class="keyword">this</span>.inputGatesById = <span class="keyword">new</span> HashMap&lt;IntermediateDataSetID, SingleInputGate&gt;();</div><div class="line"></div><div class="line">		<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="keyword">this</span>.inputGates.length; i++) &#123;</div><div class="line">			SingleInputGate gate = SingleInputGate.create(</div><div class="line">					taskNameWithSubtaskAndId, jobId, executionId, consumedPartitions.get(i), networkEnvironment,</div><div class="line">					metricGroup.getIOMetricGroup());</div><div class="line"></div><div class="line">			<span class="keyword">this</span>.inputGates[i] = gate;</div><div class="line">			inputGatesById.put(gate.getConsumedResultId(), gate);</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
+<p>这里直接用的 SingleInputGate，而 SingleInputGate 有是如何去建立和上游 ResultSubPartition 的连接关系的呢？SingleInputGate 在初始化的时候利用了关键的的参数 InputGateDeploymentDescriptor，其中包含了 partition 的一些关键信息，具体见 <code>SingleInputGate line 502</code>，这里列一下初始化过程：</p>
+<ul>
+<li><p>从 InputGateDeploymentDescriptor 中获取 IntermediateDataSetID、consumedSubpartitionIndex</p>
+<p>、InputChannelDeploymentDescriptor</p>
+</li>
+<li><p>IntermediateDataSetID 告知了消费的数据集，consumedSubpartitionIndex 告知了每个 ResultPartition 要消费的 ResultSubPartition 的索引，InputChannelDeploymentDescriptor 中告知了每个要消费的 ResultPartition 的 id 和 location 信息</p>
+</li>
+</ul>
+<p>这样 InputGate 便知道从哪里消费 partition 以及 partition 的连接信息【本地 or 远程】</p>
+<h3 id="注册-BufferPool"><a href="#注册-BufferPool" class="headerlink" title="注册 BufferPool"></a>注册 BufferPool</h3><p>在 NetworkEnvironment 注册 Task 的时候会为每个 task 的每个 InputGate 申请一个 BufferPool：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//NetworkEnvironment line323</span></div><div class="line"><span class="keyword">for</span> (SingleInputGate gate : inputGates) &#123;</div><div class="line">				BufferPool bufferPool = <span class="keyword">null</span>;</div><div class="line"></div><div class="line">				<span class="keyword">try</span> &#123;</div><div class="line">					bufferPool = networkBufferPool.createBufferPool(gate.getNumberOfInputChannels(), <span class="keyword">false</span>);</div><div class="line">					gate.setBufferPool(bufferPool);</div><div class="line">				&#125;</div><div class="line">				<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line">					<span class="keyword">if</span> (bufferPool != <span class="keyword">null</span>) &#123;</div><div class="line">						bufferPool.lazyDestroy();</div><div class="line">					&#125;</div></pre></td></tr></table></figure>
+<p>BufferPool 的最小大小为 input channel 的个数！</p>
+<h3 id="InputChannel"><a href="#InputChannel" class="headerlink" title="InputChannel"></a>InputChannel</h3><p>和上游的一个 ResultSubPartition 的连接叫做一个 InputChannel，InputChannel 一共分为三种: LocalInputChannel、RemoteInputChannel、UnknownInputChannel，分别表示一个本地连接，远程连接以及需要运行时确立的连接</p>
+<h3 id="InputGateDeploymentDescriptor"><a href="#InputGateDeploymentDescriptor" class="headerlink" title="InputGateDeploymentDescriptor"></a>InputGateDeploymentDescriptor</h3><p>上面我们提到，SingleInputGate 在初始化的时候用到了关键信息主要由 InputGateDeploymentDescriptor 来提供，那么 InputGateDeploymentDescriptor 是如何生成的呢？规则是什么？</p>
+<p>在 Task 实例化的时候有一个关键的描述对象参数：TaskDeploymentDescriptor，其中包含了 task 运行时需要的 jar 包路径，配置等重要信息，其中一个关键信息便是：InputGateDeploymentDescriptor，而 Task 是 TaskManager 负责启动的，TaskManager 接收了 JobManager 的 RPC 命令，提交作业，具体的生成首先会牵涉到 Flink 的调度，这里会简单介绍下，细节会另开一节专门介绍</p>
+<p>前面章节中，我们介绍运行时，一个并发 Task 被抽象为 ExecutionVertex，而一次执行被抽象为 Execution，在 Execution 中有负责获取资源和调度的接口：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//Execution.java line265</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">scheduleForExecution</span><span class="params">(Scheduler scheduler, <span class="keyword">boolean</span> queued)</span> <span class="keyword">throws</span> NoResourceAvailableException</span></div></pre></td></tr></table></figure>
+<p>Execution 通过 Flink 的核心调度器 [ 目前也是唯一一个 ] 先获取一个 Slot [ SimpleSlot/ flink 对资源的抽象，在调度章节会详细介绍 ]，后将 Task 部署到该 Slot 上，而 TaskDeploymentDescriptor 就在部署前被创建：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//Execution.java line 370</span></div><div class="line"><span class="keyword">final</span> TaskDeploymentDescriptor deployment = vertex.createDeploymentDescriptor(</div><div class="line">	attemptId,</div><div class="line">	slot,</div><div class="line">	operatorState,</div><div class="line">	operatorKvState,</div><div class="line">	attemptNumber);</div></pre></td></tr></table></figure>
+<p>具体的规则见 ExecutionVertex <code>line 636: createDeploymentDescriptor</code>，这里简单分析下：</p>
+<ul>
+<li>依据要输出的 IntermediateResultPartition 生成对应的 ResultPartition 实例</li>
+<li>对每个上游的 JobVertex 生成一个 InputChannelDeploymentDescriptor 数组用来实例化一个 InputGateDeploymentDescriptor</li>
+<li>获取额外配置</li>
+</ul>
+<h4 id="InputGateDeploymentDescriptor的生成规则"><a href="#InputGateDeploymentDescriptor的生成规则" class="headerlink" title="InputGateDeploymentDescriptor的生成规则"></a>InputGateDeploymentDescriptor的生成规则</h4><ul>
+<li>InputGateDeploymentDescriptor line 87</li>
+<li>对于每个上游输入边 ExecutionEdge 获取其生产者 ExecutionVertex</li>
+<li>获取 ExecutionVertex 的执行状态，如果是 RUNNING 或 FINISHED，判断生产者的 slot 和本 task 即将部署的 slot 是否在一个 Instance，生成相应的 Location 抽象： ResultPartitionLocation</li>
+<li>如果不是  RUNNING 或 FINISHED 状态，生成未知 Location</li>
+<li>一个 ExecutionEdge 实例化一个 InputGateDeploymentDescriptor ，一个 InputGateDeploymentDescripto 会同时消费上游每个生产者 ExecutionVertex 的固定 index 的 sub partition</li>
+</ul>
+<h2 id="InputProcessor"><a href="#InputProcessor" class="headerlink" title="InputProcessor"></a>InputProcessor</h2><p>对于每个 task，flink 都会生成一个 InputProcessor，具体就是 StreamIputProcessor。StreamIputProcessor 干了两件事情：</p>
+<ul>
+<li>消息解序列化并交由算子处理</li>
+<li>追踪 Watermark Event 并分发时间对齐事件</li>
+</ul>
+<p><em>时间 对齐会专门起一章讲解，这里只介绍 消息序列化 ^_^</em></p>
+<p>Flink 将消息的序列化抽象为两个模块：</p>
+<ul>
+<li>内存申请和流数据读取：由 SpillingAdaptiveSpanningRecordDeserializer 负责，从名字就可以大致了解其会动态吐磁盘【当内存不够的时候】</li>
+<li>解序列化：由 NonReusingDeserializationDelegate 负责</li>
+</ul>
+<p>NonReusingDeserializationDelegate 包含一个 serializer，依据是否需要发射水印区分为 MultiplexingStreamRecordSerializer 和 StreamRecordSerializer，这两个 serializer 只是在 TypeSerializer 上做了一层封装，这里就不做介绍了【TypeSerializer 是类型系统的重要组成，如果有时间的话我会单独开一章节介绍 flink 的类型系统】</p>
+<p>这里重点讲一下流数据的读取部分，也就是  SpillingAdaptiveSpanningRecordDeserializer</p>
+<p>###SpillingAdaptiveSpanningRecordDeserializer<br><em>每个 channel 都有一个 SpillingAdaptiveSpanningRecordDeserializer</em></p>
+<p>前面提到，SpillingAdaptiveSpanningRecordDeserializer 主要负责流数据的读取，同时通过 NonReusingDeserializationDelegate 来解序列化，从而获得可以发送给算子处理的 StreamElement。SpillingAdaptiveSpanningRecordDeserializer 内部有两个实现类：NonSpanningWrapper 和 SpanningWrapper，前者将数据存储进内存，后者存储前者存不下的部分内存数据以及将超量数据吐到磁盘。我们来解释下其核心方法：</p>
+<p>####添加 Buffer</p>
+<p>添加 Buffer 会首先 check spanningWrapper 中是否已有数据，如果有，说明 nonSpanningWrapper 中的数据已满，会继续走 spanningWrapper 添加数据，否则走 nonSpanningWrapper 添加数据。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="meta">@Override</span></div><div class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setNextMemorySegment</span><span class="params">(MemorySegment segment, <span class="keyword">int</span> numBytes)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="comment">// check if some spanning record deserialization is pending</span></div><div class="line">		<span class="keyword">if</span> (<span class="keyword">this</span>.spanningWrapper.getNumGatheredBytes() &gt; <span class="number">0</span>) &#123;</div><div class="line">			<span class="keyword">this</span>.spanningWrapper.addNextChunkFromMemorySegment(segment, numBytes);</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">else</span> &#123;</div><div class="line">			<span class="keyword">this</span>.nonSpanningWrapper.initializeFromMemorySegment(segment, <span class="number">0</span>, numBytes);</div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<p>####读取 Record</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//SpillingAdaptiveSpanningRecordDeserializer line98</span></div><div class="line"><span class="meta">@Override</span></div><div class="line">	<span class="function"><span class="keyword">public</span> DeserializationResult <span class="title">getNextRecord</span><span class="params">(T target)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="comment">// always check the non-spanning wrapper first.</span></div><div class="line">		<span class="comment">// this should be the majority of the cases for small records</span></div><div class="line">		<span class="comment">// for large records, this portion of the work is very small in comparison anyways</span></div><div class="line"></div><div class="line">		<span class="keyword">int</span> nonSpanningRemaining = <span class="keyword">this</span>.nonSpanningWrapper.remaining();</div><div class="line"></div><div class="line">		<span class="comment">// check if we can get a full length;</span></div><div class="line">		<span class="keyword">if</span> (nonSpanningRemaining &gt;= <span class="number">4</span>) &#123;</div><div class="line">			<span class="keyword">int</span> len = <span class="keyword">this</span>.nonSpanningWrapper.readInt();</div></pre></td></tr></table></figure>
+<p>简单总结：</p>
+<ul>
+<li>先判断 nonSpanningWrapper 中有没有记录，如果有优先读取并返回解序列化的类型，其中有两个特例，一是 Record 长度过大，超出了 nonSpanningWrapper 中的 Buffer 的剩余内存，这时候将 nonSpanningWrapper 的数据托管给 spanningWrapper，二是 record 的长度数据不全，这时候也是采取托管给 spanningWrapper 的策略</li>
+<li>如果 nonSpanningWrapper  没有记录，判断 spanningWrapper 是否有完全记录，有的话读取，并将 spanningWrapper 中的不完全 buffer 托管给 nonSpanningWrapper</li>
+<li>除了个别超大的 record ，对于流式计算来说，大部分走的都应该是 nonSpanningWrapper，之所以设计了 spanningWrapper，主要是为了适应超大的 Record</li>
+</ul>
+<h3 id="处理输入"><a href="#处理输入" class="headerlink" title="处理输入"></a>处理输入</h3><p>我们回来 InputProcessor</p>
+<p>上面提到了 nonSpanningWrapper 或 spanningWrapper 都是从 buffer 中读取数据的，那么这个 buffer 是如何写入的呢？</p>
+<p>答案是通过 BarrierHandler 写入</p>
+<p>这里涉及到了 flink 的 checkpoint 机制，会在下一节详细介绍，这里只介绍 Buffer 内存的获取</p>
+<p>处理输入的核心逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//StreamInputProcessor line134</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">processInput</span><span class="params">(OneInputStreamOperator&lt;IN, ?&gt; streamOperator, <span class="keyword">final</span> Object lock)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (isFinished) &#123;</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">if</span> (numRecordsIn == <span class="keyword">null</span>) &#123;</div><div class="line">			numRecordsIn = streamOperator.getMetricGroup().counter(<span class="string">"numRecordsIn"</span>);</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
+<p>这里简要概括：</p>
+<ul>
+<li>第一次进方法的时候，currentRecordDeserializer 为空，通过 barrierHandler 来协调当前读取的 channel 索引和获取数据流 Buffer</li>
+<li>以后 currentRecordDeserializer 的消费以 Buffer 为单位，Buffer 消费完会转换下一个 channel 继续消费</li>
+</ul>
+<p><em>这里的关键是 barrierHandler BufferOrEvent 事件的获取，我们向上追溯</em></p>
+<p>依据消费语义的不同，barrierHandler 有两种：</p>
+<ul>
+<li>BarrierBuffer 对应 exactly_once 语义【有 checkpoint】</li>
+<li>BarrierTracker 对应 at_least_once 语义</li>
+</ul>
+<p><em>我们先来看 BarrierBuffer</em></p>
+<h4 id="BarrierBuffer"><a href="#BarrierBuffer" class="headerlink" title="BarrierBuffer"></a>BarrierBuffer</h4><h5 id="BufferSpiller"><a href="#BufferSpiller" class="headerlink" title="BufferSpiller"></a>BufferSpiller</h5><p>BufferSpiller 消费 buffer 和 event 事件流并吐到磁盘文件，在写一定数量的流数据后，可以执行 rollOver 操作：将磁盘数据以 sequence 的方式暴露出来，同时创建新的磁盘文件以备下次读写。由于读写操作间隔很短，文件本身也不是很大，大部分读写操作都会在 ms 级别完成。</p>
+<h5 id="获取-BufferOrEvent"><a href="#获取-BufferOrEvent" class="headerlink" title="获取 BufferOrEvent"></a>获取 BufferOrEvent</h5><p><em>以下简称 BufferOrEvent 为 boe</em></p>
+<p>核心逻辑在 getNextNonBlocked方法中:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BarrierBuffer line103</span></div><div class="line"><span class="function"><span class="keyword">public</span> BufferOrEvent <span class="title">getNextNonBlocked</span><span class="params">()</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			<span class="comment">// process buffered BufferOrEvents before grabbing new ones</span></div><div class="line">			BufferOrEvent next;</div><div class="line">			<span class="keyword">if</span> (currentBuffered == <span class="keyword">null</span>) &#123;</div><div class="line">				next = inputGate.getNextBufferOrEvent();</div><div class="line">			&#125;</div></pre></td></tr></table></figure>
+<p>简单总结：</p>
+<ul>
+<li>如果当前没有堆积的 boe，直接从 InputGate 中获取，否则从缓存中获取【通过BufferSpiller缓存的数据】</li>
+<li>如果是从堆积中获取 boe，并且来自一个被 block 的 channel，再次将 boe 通过 BufferSpiller 写入缓存</li>
+<li>如果是该 boe 是消息 Buffer，返回；如果是 Checkpoint Event，处理 Barrier 事件</li>
+<li>如果获取到某个 channel 的 Partition 消费结束事件或获取不到消息，取消 block 所有的 channel，并继续读取缓存中的数据，如果最后缓存中的数据也消费完了，返回 null</li>
+</ul>
+<p><em>那么处理 barrier 的逻辑是怎样的呢？</em></p>
+<h5 id="处理-Barrier"><a href="#处理-Barrier" class="headerlink" title="处理 Barrier"></a>处理 Barrier</h5><p>处理 barrier 的核心逻辑在 processBarrier 方法中:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//BarrierBuffer line161</span></div><div class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">processBarrier</span><span class="params">(CheckpointBarrier receivedBarrier, <span class="keyword">int</span> channelIndex)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="keyword">final</span> <span class="keyword">long</span> barrierId = receivedBarrier.getId();</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (numBarriersReceived &gt; <span class="number">0</span>) &#123;</div><div class="line">			<span class="comment">// subsequent barrier of a checkpoint.</span></div><div class="line">			<span class="keyword">if</span> (barrierId == currentCheckpointId) &#123;</div><div class="line">				<span class="comment">// regular case</span></div><div class="line">				onBarrier(channelIndex);</div><div class="line">			&#125;</div></pre></td></tr></table></figure>
+<p>简单总结：</p>
+<ul>
+<li>如果当前的 Barrier 事件的 id 与当前 checkpointId 相等，则 block 该 boe 的源 channel，并增加 numBarriersReceived 计数</li>
+<li>如果 Barrier 事件的 id 大于 checkpointId，取消 block 所有的 channels，并更新当前 checkpointId 为该 id 并且阻断对应的 channel</li>
+<li>如果 numBarriersReceived 加上 已经关闭的 channel 数等于 channel 的总数，进行 checkpoint，并取消 block 所有的 channel</li>
+</ul>
+<p>这里补张图说明数据的消费过程:</p>
+<p><img src="flink-network-dataflow.png" alt="flink-network-dataflow.png"></p>
+<p>在一轮 barrier 过程中，flink 接收每个 channel 的 barrier event，获取其 barrier id 与此轮之前最大的 id：checkpoint id 作比较：如果相等，则 block 对应的 channel，被 block 的 channel 在此轮中的数据会通过 BufferSpiller 吐到磁盘【大部分情况是 page cache】；如果大于 checkpoint id，会提升 checkpoint id 为此 id，并取消 block 所有的 channel，直接进入下一轮 barrier；如果小于，直接丢弃此事件；如果此轮所有的 channel 都发送了一致的 id，则以此 id 进行 checkpoint，并取消所有的 channel block</p>
+<p>值得注意的是，每次取消所有的 channel block 都会将 BufferSpiller 中的数据暴露成 buffer sequence 并加入队列中，下次获取记录时会优先取 sequence 中的数据</p>
+<p>列举几种典型的数据流向：</p>
+<ul>
+<li>input-gate -&gt; operator：消费顺畅，一轮无任何阻塞</li>
+<li>input-gate -&gt; BufferSpiller -&gt; current-queue -&gt; operator：相对于其它 channel，消费过快，此轮被吐到磁盘，下一轮再消费</li>
+<li>current-queue -&gt; operator：相对于其它 channel，消费过慢，被吐到磁盘，下一轮再消费</li>
+</ul>
+<p><em>下面介绍数据的生产</em></p>
+<h2 id="RecordWriterOutput"><a href="#RecordWriterOutput" class="headerlink" title="RecordWriterOutput"></a>RecordWriterOutput</h2><p>在 flink 算子的声明周期一节我们介绍过：算子通过 RecordWriterOutput 将处理过的 record 写出去，下面我们来分析其行为</p>
+<p>RecordWriterOutput 实现了接口 Output，具备以下功能接口：</p>
+<ul>
+<li>collect：发射 record</li>
+<li>emitWatermark：广播 watermark 到每个输出 channel</li>
+<li>broadcastEvent：广播 Barrier Event 到每个输出 channel</li>
+</ul>
+<p>它的内部维护了一个序列化器和真正的 RecordWriter【这里是 StreamRecordWriter】，我们来稍微分析下它们</p>
+<h3 id="SpanningRecordSerializer"><a href="#SpanningRecordSerializer" class="headerlink" title="SpanningRecordSerializer"></a>SpanningRecordSerializer</h3><p>实现比较简单，将输入的 record 序列化并连同长度信息一同写入内存 Buffer</p>
+<h3 id="RecordWriter"><a href="#RecordWriter" class="headerlink" title="RecordWriter"></a>RecordWriter</h3><p>recordWriter 维护了运行时的 ResultPartitionWriter【真正写 ResultSubPartition】，将 record 序列化进内存 Buffer，来看它的构造器：</p>
+<ul>
+<li>传入 ResultPartitionWriter</li>
+<li>传入 channelSelector【不同的 partition 方式有不同的 selector，如 forward、shuffle 等】</li>
+<li>为每一个写 channel 实例化一个 SpanningRecordSerializer</li>
+</ul>
+<p><em>下面介绍其核心接口</em></p>
+<h4 id="发射-record"><a href="#发射-record" class="headerlink" title="发射 record"></a>发射 record</h4><p>对应方法 emit，核心逻辑概括：</p>
+<ul>
+<li>通过  channelSelector 选择要输出的 channel id</li>
+<li>找到对应的 SpanningRecordSerializer 并通过其序列化</li>
+<li>有三种情况：record 小于 Buffer 大小、record 等于 Buffer 大小、record 大于【准确的说应该加上长度信息的4个字节】，分别对应三种不同的序列化返回结果，这里有一个细节需要特别注意，写 record 的 Buffer 是写死的 128 bytes 长度，长度不够时会 resize 其大小，所以消息是不会丢失的</li>
+<li>如果以上的前两种情况满足意味着消息被完整序列化并写入内存 Buffer，此时通过 ResultPartitionWriter 将包含序列化数据的 Buffer 写出去</li>
+<li>同时为 SpanningRecordSerializer 向 NetworkeEnvironment 申请的 BufferPool 再次申请新 Buffer【见 TaskManager 基本组件】</li>
+</ul>
+<h6 id="生产端反压"><a href="#生产端反压" class="headerlink" title="生产端反压"></a>生产端反压</h6><p>细心的童鞋会发现，在每个发送的接口里，用来解析序列化消息的内存 Buffer 申请都走了这样一个逻辑 <code>writer.getBufferProvider().requestBufferBlocking()</code></p>
+<p>这段逻辑是阻塞操作，对应每个 ResultPartition 来说，其 BufferPool 是有限大小的，当内存不足时会阻塞，并停止继续解析消息！</p>
+<h4 id="广播-Barrier-事件"><a href="#广播-Barrier-事件" class="headerlink" title="广播 Barrier 事件"></a>广播 Barrier 事件</h4><p>逻辑与发射 Record 类似，稍有不同：</p>
+<ul>
+<li>对于每个要广播的 channel，如果有残留在内存 Buffer 的数据，先通过 ResultPartitionWriter 写出去，再写 Barrier 事件</li>
+<li>申请内存逻辑类似</li>
+</ul>
+<h3 id="ResultPartitionWriter"><a href="#ResultPartitionWriter" class="headerlink" title="ResultPartitionWriter"></a>ResultPartitionWriter</h3><p>上面介绍过 ResultPartitionWriter 是执行了序列化后 Record 的写操作，其实它是消息的路由器，具体写是通过 ResultPartition 来完成的</p>
+<h3 id="ResultPartition"><a href="#ResultPartition" class="headerlink" title="ResultPartition"></a>ResultPartition</h3><p><em>先翻译下官方的 java doc：</em></p>
+<p>一个 ResultPartition 是单个 task 的输出结果，在运行时，它是逻辑概念 IntermediateResultPartition 的一部分。ResultPartition 是一个 Buffer 的集合，并且以 ResultSubpartition 的形式进行组织，而 ResultSubPartiton 的个数等同于下游 consumer task 的个数，具体写入到哪个 ResultSubpartition 由 DistributionPattern 【上面说的 channel selector】来决定。</p>
+<p>关于生命周期：一个 ResultPartition 有三个阶段：</p>
+<ul>
+<li>Produce</li>
+<li>Consume</li>
+<li>Release</li>
+</ul>
+<p>关于 consumer tasks 的延迟部署和更新：</p>
+<ul>
+<li>依据 ResultPartition 的类型：PIPELINED 和 BLOCKING 对应两种部署模式，分别对应流式计算和批处理</li>
+<li>对于 PIPELINED 类型，consumer tasks 在 ResultPartiton 产生第一个结果 Buffer 的时候会立即部署</li>
+<li>对于 BLOCKING 类型，consumer tasks 在 ResultPartiton 结束后才会部署</li>
+</ul>
+<p>观察 <code>line162</code> 可知如果是 PIPELINED 类型，ResultSubPartition 的类型为：PipelinedSubpartition</p>
+<p>我们来分析下它的核心接口：</p>
+<h4 id="注册-BufferPool-1"><a href="#注册-BufferPool-1" class="headerlink" title="注册 BufferPool"></a>注册 BufferPool</h4><p>代码见 <code>line187 registerBufferPool</code> 方法，此 BufferPool 为 TaskManager 在运行 task 时 通过 NetworkEnvironment 注册进来的。如果是 BLOCKING 类型，这里会注册 BufferPool 的 owner 为此 ResultPartiton，NetworkEnvironment 如果出现内存不足的情况，会通过 ResultPartiton 的引用，以 Sub Partiton 为单位将内存释放掉【见 TaskManager 基本组件 NetworkEnvironment】。</p>
+<p>既然注册 BufferPool 是以 task 为单位的，那么每个 task 会拥有几个 BufferPool， BufferPool 的大小又是多少呢？在 NetworkEnvironment 中有这样一段逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//NetworkEnvironment line297</span></div><div class="line"><span class="keyword">try</span> &#123;</div><div class="line">					bufferPool = networkBufferPool.createBufferPool(partition.getNumberOfSubpartitions(), <span class="keyword">false</span>);</div><div class="line">					partition.registerBufferPool(bufferPool);</div><div class="line"></div><div class="line">					partitionManager.registerResultPartition(partition);</div><div class="line">				&#125;</div></pre></td></tr></table></figure>
+<p>其中的 <code>partition.getNumberOfSubpartitions()</code> 是 ResultPartition 的 sub partition 的个数，我们可以看到，一个 task 拥有的 BufferPool 个数等于它产生的 ResultPartition 的个数，一个 ResultPartition 对应一个 BufferPool，而每个 BufferPool 的最小大小等于它的 sub partition 的个数【consumer task 的个数】。为什么说是最小大小，见 TaskManager 基本组件 NetworkEnvironment。</p>
+<h4 id="写入-Buffer"><a href="#写入-Buffer" class="headerlink" title="写入 Buffer"></a>写入 Buffer</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// ResultPartition line244</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">(Buffer buffer, <span class="keyword">int</span> subpartitionIndex)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="keyword">boolean</span> success = <span class="keyword">false</span>;</div><div class="line"></div><div class="line">		<span class="keyword">try</span> &#123;</div><div class="line">			checkInProduceState();</div></pre></td></tr></table></figure>
+<p>简单总结：</p>
+<ul>
+<li>找到对应的 ResultSubPartition 并写入 Buffer</li>
+<li>如果是第一次写入，并且是 PIPELINED 类型，通知 JobManager 可以部署下游 consumer，具体细节将会在 调度一章专门讲解</li>
+<li>如果写入失败，回收内存 Buffer</li>
+</ul>
+<h4 id="ResultSubpatition"><a href="#ResultSubpatition" class="headerlink" title="ResultSubpatition"></a>ResultSubpatition</h4><p>这里我们只介绍 PipelinedSubpartition，实现比较简单，就不具体介绍了，有一点需要注意，就是 NotificationListener</p>
+<p>每次 ResultSubpatition 的状态有变动【被写入，被释放，写入完成等】都会通知 NotificationListener，通知完之后就会销毁 NotificationListener 的注册</p>
+<p><em>典型的我们详细分析下 add Buffer 后通过 NotificationListener 触发的一些列行为</em></p>
+<p>PipelinedSubPartition 在添加一个 Buffer 后，如果 NotificationListener 不为 null，那么会通知 NotificationListener，NotificationListener 共有两个实现类 LocalInputChannel 和 SequenceNumberingSubpartitionView，分别对应本地传输和网络传输。</p>
+<h4 id="与-InputChannel-的交互"><a href="#与-InputChannel-的交互" class="headerlink" title="与 InputChannel 的交互"></a>与 InputChannel 的交互</h4><p>在 consumer task 向 SingleInputGate 请求 Buffer 时，会先触发 requestPartitions 操作，不同的 channel 会触发不同的行为:</p>
+<ul>
+<li>对于 LocalInputChannel 来说就是获取 ResultSubPartitonView 并将自己注册到对应的 ResultSubPartition 中</li>
+<li>对于 RemoteInputChannel 会触发 netty 连接并开始请求队列数据</li>
+</ul>
+<p><em>我们先来看 LocalInputChannel</em></p>
+<h5 id="LocalInputChannel"><a href="#LocalInputChannel" class="headerlink" title="LocalInputChannel"></a>LocalInputChannel</h5><p>LocalInputChannel 在收到通知后，发生以下行为：</p>
+<ul>
+<li>check ResultSubPartitonView 中有无数据，如果有的话通知 SingleInputGate，并将自己【LocalInputChannel】加入到 SingleInputGate 的有数据 channel 队列中</li>
+<li>如果没有数据，将自己重新注册到对应的 ResultSubPartition 中</li>
+</ul>
+<p><em>再来看SequenceNumberingSubpartitionView，不过在这之前先介绍 RemoteInputChannel</em></p>
+<h5 id="RemoteInputChannel"><a href="#RemoteInputChannel" class="headerlink" title="RemoteInputChannel"></a>RemoteInputChannel</h5><p>上面提到 RemoteInputChannel 在 SingleInputGate 第一次执行获取 Buffer 的逻辑时，会触发 RemoteInputChannel 的网络连接，具体逻辑如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//RemoteInputChannel line114</span></div><div class="line"><span class="meta">@Override</span></div><div class="line"><span class="function"><span class="keyword">void</span> <span class="title">requestSubpartition</span><span class="params">(<span class="keyword">int</span> subpartitionIndex)</span> <span class="keyword">throws</span> IOException, InterruptedException </span>&#123;</div><div class="line">		<span class="keyword">if</span> (partitionRequestClient == <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="comment">// Create a client and request the partition</span></div><div class="line">			partitionRequestClient = connectionManager</div><div class="line">					.createPartitionRequestClient(connectionId);</div><div class="line"></div><div class="line">			partitionRequestClient.requestSubpartition(partitionId, subpartitionIndex, <span class="keyword">this</span>, <span class="number">0</span>);</div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<p>这一段先会创建 netty 连接，然后会请求 netty 数据，下面我们详细分析 flink 关于 netty 连接的抽象</p>
+<h2 id="Netty-连接"><a href="#Netty-连接" class="headerlink" title="Netty 连接"></a>Netty 连接</h2><p>flink 采用 netty 作为底层的网络传输框架，各个 Instance 之间会依照消费依赖建立一个 Netty 连接，然后通过 NetworkEnvironment 管理数据的消费，本人对 Netty 研究的不是很精，这里只站在 flink 的角度梳理一些重点的组件</p>
+<h3 id="ConnectionManager"><a href="#ConnectionManager" class="headerlink" title="ConnectionManager"></a>ConnectionManager</h3><p>flink 通过 ConnectionManager 来创建和管理一个 Instance 上的 netty 连接【client】，它有两个实现：LocalConnectionManager 和 NettyConnectionManager，这里只介绍后者</p>
+<h4 id="NettyConnectionManager"><a href="#NettyConnectionManager" class="headerlink" title="NettyConnectionManager"></a>NettyConnectionManager</h4><h5 id="PartitionRequestQueue"><a href="#PartitionRequestQueue" class="headerlink" title="PartitionRequestQueue"></a>PartitionRequestQueue</h5><p>对于 netty 来说，这是 server 端 netty handler 的 adapter，除了基本的事件处理如注册 channel 外还定义了用户可以手动触发的两个事件：</p>
+<ul>
+<li>取消 channel 事件：会取消对应的 channel 的队列【用来读取对应 subPartition 的临时队列】，并标志该 channel 已被取消</li>
+<li>入队事件：当开始消费某个 sub partition 时会触发此事件，会将该队列 queue 加入到已有的 队列中</li>
+</ul>
+<h6 id="SequenceNumberingSubpartitionView"><a href="#SequenceNumberingSubpartitionView" class="headerlink" title="SequenceNumberingSubpartitionView"></a>SequenceNumberingSubpartitionView</h6><p>上面说的对应每个 sub partition 的读取 queue 被抽象为 SequenceNumberingSubpartitionView，它维护了两个成员 ResultSubpartitionView 和 一个不断递增的 buffer 序列编号，之前在介绍 ResultPartition 时介绍过，当往 ResultSubPartiton 中写数据时会通知对应的 NotificationListener 【如果有的话】，其中对应 RemoteInputChannel 的便是 SequenceNumberingSubpartitionView，它在收到通知后会触发 入队 用户事件，将自己加入到已有队列中，表明自己是一个有数据队列</p>
+<h6 id="数据发送"><a href="#数据发送" class="headerlink" title="数据发送"></a>数据发送</h6><p>每当 channel 可写，就会触发 netty 的 channelWritabilityChanged 接口调用，触发数据发送，我们来看下数据发送的核心逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//PartitionRequestQueue line134</span></div><div class="line"><span class="meta">@Override</span></div><div class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">channelWritabilityChanged</span><span class="params">(ChannelHandlerContext ctx)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		writeAndFlushNextMessageIfPossible(ctx.channel());</div><div class="line">	&#125;</div><div class="line"></div><div class="line">	<span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">writeAndFlushNextMessageIfPossible</span><span class="params">(<span class="keyword">final</span> Channel channel)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="keyword">if</span> (fatalError) &#123;</div><div class="line">			<span class="keyword">return</span>;</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		Buffer buffer = <span class="keyword">null</span>;</div><div class="line"></div><div class="line">		<span class="keyword">try</span> &#123;</div><div class="line">			<span class="keyword">if</span> (channel.isWritable()) &#123;</div><div class="line">				<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">					<span class="keyword">if</span> (currentPartitionQueue == <span class="keyword">null</span> &amp;&amp; (currentPartitionQueue = queue.poll()) == <span class="keyword">null</span>) &#123;</div><div class="line">						<span class="keyword">return</span>;</div><div class="line">					&#125;</div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>如果当前没有可写数据的队列，直接返回</li>
+<li>如果某个 queue 有数据，会一直读取该队列的数据发送到下游，知道把数据读完后将该队列注册到 对应的 ResultSubPartition 中，等待下次有数据时再次入队</li>
+<li>如果某个 ResultSubPartition 被 release 【批处理内存不足时】，标识其被 release</li>
+<li>如果收到某个 ResultSubPartition 处理完成的事件，释放对应 ResultSubPartition 所有的资源【将对应的 ResultSubPartition 资源释放】并给出相应通知</li>
+</ul>
+<h5 id="PartitionRequetServerHandler"><a href="#PartitionRequetServerHandler" class="headerlink" title="PartitionRequetServerHandler"></a>PartitionRequetServerHandler</h5><p>Netty Server 端的 handler，负责做一些初始化和派发事件的功能</p>
+<h6 id="消息路由"><a href="#消息路由" class="headerlink" title="消息路由"></a>消息路由</h6><p>该 handler 负责路由以下消息 NettyMessage：</p>
+<ul>
+<li>PartitionRequest：将对应的 ResultSubPartition 封装成 SequenceNumberingSubpartitionView 入队</li>
+<li>TaskEventRequest：像对应的 ResultPartitionWriter 派发 task event</li>
+<li>CancelPartition</li>
+<li>CloseRequest</li>
+</ul>
+<h5 id="PartitionRequestProtocol"><a href="#PartitionRequestProtocol" class="headerlink" title="PartitionRequestProtocol"></a>PartitionRequestProtocol</h5><p>flink 的 netty 消息 协议，主要是客户端和 Server 端 handlers 的获取</p>
+<h5 id="NettyBufferPool"><a href="#NettyBufferPool" class="headerlink" title="NettyBufferPool"></a>NettyBufferPool</h5><p>配置每个 netty chunk 为 16M</p>
+<h3 id="PartitionRequestClient"><a href="#PartitionRequestClient" class="headerlink" title="PartitionRequestClient"></a>PartitionRequestClient</h3><p>通过 NettyConnectionManager 可以创建 PartitionRequestClient，它封装了原生的 NettyClient，通过 PartitionRequestClientFactory 来创建</p>
+<h4 id="PartitionRequestClientFactory"><a href="#PartitionRequestClientFactory" class="headerlink" title="PartitionRequestClientFactory"></a>PartitionRequestClientFactory</h4><p>主要用来缓存已获得的 NettyChannel，这里就不具体介绍了，有兴趣的童鞋可以自行研究</p>
+<h4 id="PartitionRequestClientHandler"><a href="#PartitionRequestClientHandler" class="headerlink" title="PartitionRequestClientHandler"></a>PartitionRequestClientHandler</h4><p>Netty Client 端的 Client Handler，负责将消息 decode 到 RemoteInputChannel，在 PartitionRequestClient 发起 PartitionRequest 请求消息的时候会将对应的 RemoteInputChannel 加入到 PartitionRequestClientHandler 备份起来。</p>
+<h5 id="Channel-消息读"><a href="#Channel-消息读" class="headerlink" title="Channel 消息读"></a>Channel 消息读</h5><h6 id="消费端反压"><a href="#消费端反压" class="headerlink" title="消费端反压"></a>消费端反压</h6><p>为了防止读取消息时内存不够，读速度快于生产，这里有两个有意思的 runnable，BufferListenerTask 和 StagedMessagesHandlerTask，它们均由 netty io 线程负责执行，当消息顺畅读取，内存充足时，当然是 decode 消息，并将消息加入到对应的 RemoteInputChannel buffer 队列中，但是内存不足时，上面的两个 task 就会扮演重要角色！</p>
+<ul>
+<li>如果之前有消息堆积，将消息直接写入堆积队列</li>
+<li>BufferListenerTask：当第一次出现读内存不足时，会将对应的 Buffer 托管给 BufferListenerTask，BufferListenerTask 将自己注册到 SingleInputGate 的 BufferPool 中，同时停止 channel 的自动读取，当 BufferPool 有内存，会通知 BufferListenerTask 并解析消息</li>
+<li>这时候有一个意外，就是收到通知后仍然没有获取到内存 Buffer，这表明 BufferPool 已经被销毁【批处理内存不够时】，这时候启动 StagedMessagesHandlerTask，一直循环解析堆积队列里的数据</li>
+</ul>
+<p>这里涉及到了 backpressure，流式计算里的反压技术，flink 采取的是逐级反压，并且这两个 task 扮演了消费端的 反压角色</p>
+<p>这里补一张图，说明 flink 的消费与生产之间的关系：</p>
+<p><img src="netty-client-server.png" alt="netty-client-server.png"></p>
+<p>这里链接一个 flink 官方的 wiki介绍了 flink task 的数据流交换细节，比较经典，这里偷个懒，就不翻译了，有时间一定补上^_^</p>
+<blockquote>
+<p> <a href="https://cwiki.apache.org/confluence/display/FLINK/Data+exchange+between+tasks" target="_blank" rel="external">flink data exchange betweek tasks </a></p>
+</blockquote>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>生活不止眼前的苟且！</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/wechat-reward-image.png" alt="chenyuzhao WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/flink/" rel="tag"># flink</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/02/09/taskmanager基本组件/" rel="next" title="taskmanager 基本组件">
+                <i class="fa fa-chevron-left"></i> taskmanager 基本组件
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/02/09/flink-watermark-checkpoint/" rel="prev" title="flink watermark and checkpoint">
+                flink watermark and checkpoint <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+          
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="chenyuzhao" />
+          <p class="site-author-name" itemprop="name">chenyuzhao</p>
+          <p class="site-description motion-element" itemprop="description">本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~</p>
+        </div>
+        <nav class="site-state motion-element">
+        
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">9</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">4</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IntermediateResult"><span class="nav-number">2.</span> <span class="nav-text">IntermediateResult</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#InputGate"><span class="nav-number">3.</span> <span class="nav-text">InputGate</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#InputGate的创建"><span class="nav-number">3.1.</span> <span class="nav-text">InputGate的创建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#注册-BufferPool"><span class="nav-number">3.2.</span> <span class="nav-text">注册 BufferPool</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#InputChannel"><span class="nav-number">3.3.</span> <span class="nav-text">InputChannel</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#InputGateDeploymentDescriptor"><span class="nav-number">3.4.</span> <span class="nav-text">InputGateDeploymentDescriptor</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#InputGateDeploymentDescriptor的生成规则"><span class="nav-number">3.4.1.</span> <span class="nav-text">InputGateDeploymentDescriptor的生成规则</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#InputProcessor"><span class="nav-number">4.</span> <span class="nav-text">InputProcessor</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#处理输入"><span class="nav-number">4.1.</span> <span class="nav-text">处理输入</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#BarrierBuffer"><span class="nav-number">4.1.1.</span> <span class="nav-text">BarrierBuffer</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#BufferSpiller"><span class="nav-number">4.1.1.1.</span> <span class="nav-text">BufferSpiller</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#获取-BufferOrEvent"><span class="nav-number">4.1.1.2.</span> <span class="nav-text">获取 BufferOrEvent</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#处理-Barrier"><span class="nav-number">4.1.1.3.</span> <span class="nav-text">处理 Barrier</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RecordWriterOutput"><span class="nav-number">5.</span> <span class="nav-text">RecordWriterOutput</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#SpanningRecordSerializer"><span class="nav-number">5.1.</span> <span class="nav-text">SpanningRecordSerializer</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RecordWriter"><span class="nav-number">5.2.</span> <span class="nav-text">RecordWriter</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#发射-record"><span class="nav-number">5.2.1.</span> <span class="nav-text">发射 record</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#生产端反压"><span class="nav-number">5.2.1.0.1.</span> <span class="nav-text">生产端反压</span></a></li></ol></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#广播-Barrier-事件"><span class="nav-number">5.2.2.</span> <span class="nav-text">广播 Barrier 事件</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ResultPartitionWriter"><span class="nav-number">5.3.</span> <span class="nav-text">ResultPartitionWriter</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#ResultPartition"><span class="nav-number">5.4.</span> <span class="nav-text">ResultPartition</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#注册-BufferPool-1"><span class="nav-number">5.4.1.</span> <span class="nav-text">注册 BufferPool</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#写入-Buffer"><span class="nav-number">5.4.2.</span> <span class="nav-text">写入 Buffer</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ResultSubpatition"><span class="nav-number">5.4.3.</span> <span class="nav-text">ResultSubpatition</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#与-InputChannel-的交互"><span class="nav-number">5.4.4.</span> <span class="nav-text">与 InputChannel 的交互</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#LocalInputChannel"><span class="nav-number">5.4.4.1.</span> <span class="nav-text">LocalInputChannel</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#RemoteInputChannel"><span class="nav-number">5.4.4.2.</span> <span class="nav-text">RemoteInputChannel</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Netty-连接"><span class="nav-number">6.</span> <span class="nav-text">Netty 连接</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#ConnectionManager"><span class="nav-number">6.1.</span> <span class="nav-text">ConnectionManager</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#NettyConnectionManager"><span class="nav-number">6.1.1.</span> <span class="nav-text">NettyConnectionManager</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#PartitionRequestQueue"><span class="nav-number">6.1.1.1.</span> <span class="nav-text">PartitionRequestQueue</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#SequenceNumberingSubpartitionView"><span class="nav-number">6.1.1.1.1.</span> <span class="nav-text">SequenceNumberingSubpartitionView</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#数据发送"><span class="nav-number">6.1.1.1.2.</span> <span class="nav-text">数据发送</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#PartitionRequetServerHandler"><span class="nav-number">6.1.1.2.</span> <span class="nav-text">PartitionRequetServerHandler</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#消息路由"><span class="nav-number">6.1.1.2.1.</span> <span class="nav-text">消息路由</span></a></li></ol></li><li class="nav-item nav-level-5"><a class="nav-link" href="#PartitionRequestProtocol"><span class="nav-number">6.1.1.3.</span> <span class="nav-text">PartitionRequestProtocol</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#NettyBufferPool"><span class="nav-number">6.1.1.4.</span> <span class="nav-text">NettyBufferPool</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PartitionRequestClient"><span class="nav-number">6.2.</span> <span class="nav-text">PartitionRequestClient</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#PartitionRequestClientFactory"><span class="nav-number">6.2.1.</span> <span class="nav-text">PartitionRequestClientFactory</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#PartitionRequestClientHandler"><span class="nav-number">6.2.2.</span> <span class="nav-text">PartitionRequestClientHandler</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Channel-消息读"><span class="nav-number">6.2.2.1.</span> <span class="nav-text">Channel 消息读</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#消费端反压"><span class="nav-number">6.2.2.1.1.</span> <span class="nav-text">消费端反压</span></a></li></ol></li></ol></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenyuzhao</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+
+  
+
+    <script type="text/javascript">
+      var disqus_shortname = 'danny0405';
+      var disqus_identifier = '2017/02/09/flink网络栈/';
+
+      var disqus_title = "flink 网络栈";
+
+
+      function run_disqus_script(disqus_script) {
+        var dsq = document.createElement('script');
+        dsq.type = 'text/javascript';
+        dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      }
+
+      run_disqus_script('count.js');
+
+      
+        var disqus_config = function () {
+            this.page.url = disqus_url;
+            this.page.identifier = disqus_identifier;
+            this.page.title = disqus_title;
+        };
+        run_disqus_script('embed.js');
+      
+
+    </script>
+  
+
+
+
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("IHwwV5iwSmi4anND94SPVRfX-gzGzoHsz", "HA0GffL0nVFkTaYDd2HVvyyN");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+
+</body>
+</html>

@@ -1,0 +1,1048 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+  <meta name="google-site-verification" content="xQH1_363DDiHTPTlCBVkfWBilNX5dOtadRWvbWhVrIA" />
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="flink," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="玉兆的博客" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
+<meta property="og:type" content="article">
+<meta property="og:title" content="flink 对用户代码异常处理">
+<meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/index.html">
+<meta property="og:site_name" content="玉兆的博客">
+<meta property="og:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
+<meta property="og:updated_time" content="2017-02-09T05:56:14.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="flink 对用户代码异常处理">
+<meta name="twitter:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/"/>
+
+
+
+
+
+  <title> flink 对用户代码异常处理 | 玉兆的博客 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-88432446-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?1bde8b788c41c89cd3d082567500188c";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">玉兆的博客</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+    
+      <p class="site-subtitle">心如止水</p>
+    
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="chenyuzhao">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.png">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="玉兆的博客">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="玉兆的博客" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                flink 对用户代码异常处理
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-09T13:51:54+08:00">
+                2017-02-09
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Streaming/" itemprop="url" rel="index">
+                    <span itemprop="name">Streaming</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/09/flink对用户代码异常处理/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/02/09/flink对用户代码异常处理/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2017/02/09/flink对用户代码异常处理/" class="leancloud_visitors" data-flag-title="flink 对用户代码异常处理">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+              <div class="post-description">
+                  flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？
+              </div>
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？</p>
+<h2 id="异常后的组件通信"><a href="#异常后的组件通信" class="headerlink" title="异常后的组件通信"></a>异常后的组件通信</h2><p>flink 的 task 的 Runnable 类是 Task.java，我们观察到它的 <code>run()</code> 方法真个被一个大的 try catch 包住，我们重点关注 catch 用户异常之后的部分：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//Task line612</span></div><div class="line">		<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line"></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line">			<span class="comment">// the execution failed. either the invokable code properly failed, or</span></div><div class="line">			<span class="comment">// an exception was thrown as a side effect of cancelling</span></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line"></div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				<span class="comment">// transition into our final state. we should be either in DEPLOYING, RUNNING, CANCELING, or FAILED</span></div><div class="line">				<span class="comment">// loop for multiple retries during concurrent state changes via calls to cancel() or</span></div><div class="line">				<span class="comment">// to failExternally()</span></div><div class="line">				<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">					ExecutionState current = <span class="keyword">this</span>.executionState;</div></pre></td></tr></table></figure>
+<p>简单总结其逻辑：</p>
+<ul>
+<li><p>如果当前的执行状态是 <code>ExecutionState.RUNNING</code> 或者 <code>ExecutionState.DEPLOYING</code>，表明是从正常运行到异常状态的过度，这时候判断是主动 Cancel 执行，如果是，执行 StreamTask 的 cancel 方法， 并通知观察者它的状态已变成：<code>ExecutionState.CANCELED</code>；如果不是主动 Cancel，表明是用户异常触发，这时候同样执行 StreamTask 的 cancel 方法，然后通知观察者它的状态变成：<code>ExecutionState.FAILED</code>，这里的 cancel 方法留给 flink 内部的算子来实现，对于普通 task ，会停止消费上游数据，对于 source task，会停止发送源数据</p>
+</li>
+<li><p>对于用户异常来说，通知观察者的状态应该为 <code>ExecutionState.FAILED</code>，<em>我们下面详细分析</em></p>
+</li>
+<li><p>finally 的部分会释放掉这个 task 占有的所有资源，包括线程池、输入 InputGate 及 写出 ResultPartition 占用的全部 BufferPool、缓存的 jar 包等，最后通知 TaskManager 这个 Job 的 这个 task 已经执行结束：</p>
+<p><code>notifyFinalState()</code></p>
+</li>
+</ul>
+<ul>
+<li>如果异常逻辑发生了任何其它异常，说明是 TaskManager 相关环境发生问题，这个时候会杀死 TaskManager</li>
+</ul>
+<h3 id="通知TaskManager"><a href="#通知TaskManager" class="headerlink" title="通知TaskManager"></a>通知TaskManager</h3><p>上面提到，finally 的最后阶段会通知 TaskManager，我们来梳理逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//TaskManager line444</span></div><div class="line"><span class="comment">// removes the task from the TaskManager and frees all its resources</span></div><div class="line">        <span class="function"><span class="keyword">case</span> <span class="title">TaskInFinalState</span><span class="params">(executionID)</span> </span>=&gt;</div><div class="line">          unregisterTaskAndNotifyFinalState(executionID)</div><div class="line"></div><div class="line"><span class="comment">//TaskManager line1228</span></div><div class="line"><span class="function"><span class="keyword">private</span> def <span class="title">unregisterTaskAndNotifyFinalState</span><span class="params">(executionID: ExecutionAttemptID)</span>: Unit </span>= &#123;</div><div class="line"></div><div class="line">    val task = runningTasks.remove(executionID)</div><div class="line">    <span class="keyword">if</span> (task != <span class="keyword">null</span>) &#123;</div><div class="line"></div><div class="line">      <span class="comment">// the task must be in a terminal state</span></div><div class="line">      <span class="keyword">if</span> (!task.getExecutionState.isTerminal) &#123;</div><div class="line">        <span class="keyword">try</span> &#123;</div><div class="line">          task.failExternally(<span class="keyword">new</span> Exception(<span class="string">"Task is being removed from TaskManager"</span>))</div><div class="line">        &#125; <span class="keyword">catch</span> &#123;</div><div class="line">          <span class="keyword">case</span> e: Exception =&gt; log.error(<span class="string">"Could not properly fail task"</span>, e)</div><div class="line">        &#125;</div><div class="line">      &#125;</div><div class="line"></div><div class="line"><span class="comment">//TaskManager line1251</span></div><div class="line">     self ! decorateMessage(</div><div class="line">        UpdateTaskExecutionState(</div><div class="line">          <span class="keyword">new</span> TaskExecutionState(</div><div class="line">            task.getJobID,</div><div class="line">            task.getExecutionId,</div><div class="line">            task.getExecutionState,</div><div class="line">            task.getFailureCause,</div><div class="line">            accumulators)</div><div class="line">        )</div><div class="line">      )</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line1189</span></div><div class="line">				<span class="keyword">case</span> FAILED:</div><div class="line">					attempt.markFailed(state.getError(userClassLoader));</div><div class="line">					<span class="keyword">return</span> <span class="keyword">true</span>;</div><div class="line"></div><div class="line"><span class="comment">//Execution line658</span></div><div class="line">	<span class="function"><span class="keyword">void</span> <span class="title">markFinished</span><span class="params">(Map&lt;AccumulatorRegistry.Metric, Accumulator&lt;?, ?&gt;&gt; flinkAccumulators, Map&lt;String, Accumulator&lt;?, ?&gt;&gt; userAccumulators)</span> </span>&#123;</div><div class="line"></div><div class="line">		<span class="comment">// this call usually comes during RUNNING, but may also come while still in deploying (very fast tasks!)</span></div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			ExecutionState current = <span class="keyword">this</span>.state;</div><div class="line"></div><div class="line">			<span class="keyword">if</span> (current == RUNNING || current == DEPLOYING) &#123;</div><div class="line"></div><div class="line">				<span class="keyword">if</span> (transitionState(current, FINISHED)) &#123;</div><div class="line">					<span class="keyword">try</span> &#123;</div><div class="line"></div><div class="line"><span class="comment">//Execution line991</span></div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				vertex.notifyStateTransition(attemptId, targetState, error);</div><div class="line">			&#125;</div><div class="line">			<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line">				LOG.error(<span class="string">"Error while notifying execution graph of execution state transition."</span>, t);</div><div class="line">			&#125;</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line1291</span></div><div class="line">	<span class="function"><span class="keyword">void</span> <span class="title">notifyExecutionChange</span><span class="params">(JobVertexID vertexId, <span class="keyword">int</span> subtask, ExecutionAttemptID executionID, ExecutionState</span></span></div><div class="line">							newExecutionState, Throwable error)</div><div class="line">	&#123;</div><div class="line">     <span class="comment">//...</span></div><div class="line">        <span class="comment">// see what this means for us. currently, the first FAILED state means -&gt; FAILED</span></div><div class="line">		<span class="keyword">if</span> (newExecutionState == ExecutionState.FAILED) &#123;</div><div class="line">			fail(error);</div><div class="line">		&#125;</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line845     </span></div><div class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">fail</span><span class="params">(Throwable t)</span> </span>&#123;</div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			JobStatus current = state;</div><div class="line">			<span class="comment">// stay in these states</span></div><div class="line">			<span class="keyword">if</span> (current == JobStatus.FAILING ||</div><div class="line">				current == JobStatus.SUSPENDED ||</div><div class="line">				current.isGloballyTerminalState()) &#123;</div><div class="line">				<span class="keyword">return</span>;</div><div class="line">			&#125; <span class="keyword">else</span> <span class="keyword">if</span> (current == JobStatus.RESTARTING &amp;&amp; transitionState(current, JobStatus.FAILED, t)) &#123;</div><div class="line">				<span class="keyword">synchronized</span> (progressLock) &#123;</div><div class="line">					postRunCleanup();</div><div class="line">					progressLock.notifyAll();</div><div class="line"></div><div class="line">					LOG.info(<span class="string">"Job &#123;&#125; failed during restart."</span>, getJobID());</div><div class="line">					<span class="keyword">return</span>;</div><div class="line">				&#125;</div><div class="line">			&#125; <span class="keyword">else</span> <span class="keyword">if</span> (transitionState(current, JobStatus.FAILING, t)) &#123;</div><div class="line">				<span class="keyword">this</span>.failureCause = t;</div><div class="line"></div><div class="line">				<span class="keyword">if</span> (!verticesInCreationOrder.isEmpty()) &#123;</div><div class="line">					<span class="comment">// cancel all. what is failed will not cancel but stay failed</span></div><div class="line">					<span class="keyword">for</span> (ExecutionJobVertex ejv : verticesInCreationOrder) &#123;</div><div class="line">						ejv.cancel();</div><div class="line">					&#125;</div><div class="line">				&#125; <span class="keyword">else</span> &#123;</div><div class="line">					<span class="comment">// set the state of the job to failed</span></div><div class="line">					transitionState(JobStatus.FAILING, JobStatus.FAILED, t);</div><div class="line">				&#125;</div><div class="line"></div><div class="line">				<span class="keyword">return</span>;</div><div class="line">			&#125;</div><div class="line"></div><div class="line">			<span class="comment">// no need to treat other states</span></div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>在一些合法性 check 之后，TaskManager 会给自己发送一条路由消息：<code>UpdateTaskExecutionState</code>，TaskManager 继而将这条消息转发给 JobManager</li>
+<li>JobManager 会标志 Job 状态为 FAILING 并通知 JobCli，并且立即停止所有 task 的执行，这时候 CheckpointCoordinator 在执行 checkpoint 的时候感知到 task 失败状态会立即返回，停止 checkpoint</li>
+</ul>
+<h2 id="异常后的资源释放"><a href="#异常后的资源释放" class="headerlink" title="异常后的资源释放"></a>异常后的资源释放</h2><p>主要包括以下资源：</p>
+<ul>
+<li>网络资源：InputGate 和 ResultPartiton 的内存占用</li>
+<li>其他内存：通过 MemoryManager 申请的资源</li>
+<li>缓存资源：lib 包和其他缓存</li>
+<li>线程池：Task 内部持有</li>
+</ul>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>生活不止眼前的苟且！</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/wechat-reward-image.png" alt="chenyuzhao WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/flink/" rel="tag"># flink</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/02/09/flink-scheduler/" rel="next" title="flink scheduler">
+                <i class="fa fa-chevron-left"></i> flink scheduler
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+          
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="chenyuzhao" />
+          <p class="site-author-name" itemprop="name">chenyuzhao</p>
+          <p class="site-description motion-element" itemprop="description">本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~</p>
+        </div>
+        <nav class="site-state motion-element">
+        
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">9</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">4</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#异常后的组件通信"><span class="nav-number">2.</span> <span class="nav-text">异常后的组件通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#通知TaskManager"><span class="nav-number">2.1.</span> <span class="nav-text">通知TaskManager</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#异常后的资源释放"><span class="nav-number">3.</span> <span class="nav-text">异常后的资源释放</span></a></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenyuzhao</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+
+  
+
+    <script type="text/javascript">
+      var disqus_shortname = 'danny0405';
+      var disqus_identifier = '2017/02/09/flink对用户代码异常处理/';
+
+      var disqus_title = "flink 对用户代码异常处理";
+
+
+      function run_disqus_script(disqus_script) {
+        var dsq = document.createElement('script');
+        dsq.type = 'text/javascript';
+        dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      }
+
+      run_disqus_script('count.js');
+
+      
+        var disqus_config = function () {
+            this.page.url = disqus_url;
+            this.page.identifier = disqus_identifier;
+            this.page.title = disqus_title;
+        };
+        run_disqus_script('embed.js');
+      
+
+    </script>
+  
+
+
+
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("IHwwV5iwSmi4anND94SPVRfX-gzGzoHsz", "HA0GffL0nVFkTaYDd2HVvyyN");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+
+</body>
+</html>

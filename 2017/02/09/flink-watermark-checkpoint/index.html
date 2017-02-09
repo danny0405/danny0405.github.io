@@ -1,0 +1,1139 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+  <meta name="google-site-verification" content="xQH1_363DDiHTPTlCBVkfWBilNX5dOtadRWvbWhVrIA" />
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="flink,watermark,checkpoint," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="玉兆的博客" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0" />
+
+
+
+
+
+
+<meta name="description" content="在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起，接着会介绍 checkpoint">
+<meta property="og:type" content="article">
+<meta property="og:title" content="flink watermark and checkpoint">
+<meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/index.html">
+<meta property="og:site_name" content="玉兆的博客">
+<meta property="og:description" content="在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起，接着会介绍 checkpoint">
+<meta property="og:image" content="https://danny0405.github.io/checkpoint-event-flow.png">
+<meta property="og:image" content="https://danny0405.github.io/state-backend-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/value-state-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/state-describtor.png">
+<meta property="og:image" content="https://danny0405.github.io/fs-snapshort-extend.png">
+<meta property="og:updated_time" content="2017-02-09T05:46:45.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="flink watermark and checkpoint">
+<meta name="twitter:description" content="在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起，接着会介绍 checkpoint">
+<meta name="twitter:image" content="https://danny0405.github.io/checkpoint-event-flow.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/"/>
+
+
+
+
+
+  <title> flink watermark and checkpoint | 玉兆的博客 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-88432446-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "https://hm.baidu.com/hm.js?1bde8b788c41c89cd3d082567500188c";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">玉兆的博客</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+    
+      <p class="site-subtitle">心如止水</p>
+    
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="javascript:;" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="chenyuzhao">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.png">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="玉兆的博客">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="玉兆的博客" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                flink watermark and checkpoint
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-09T13:44:06+08:00">
+                2017-02-09
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Streaming/" itemprop="url" rel="index">
+                    <span itemprop="name">Streaming</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2017/02/09/flink-watermark-checkpoint/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/02/09/flink-watermark-checkpoint/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2017/02/09/flink-watermark-checkpoint/" class="leancloud_visitors" data-flag-title="flink watermark and checkpoint">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+              <div class="post-description">
+                  在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起，接着会介绍 checkpoint
+              </div>
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起</p>
+<p>为什么将 Watermark 和 Checkpoint 放在一起将，是因为它们在原理上有相似之处：上游节点逐级广播消息给下游节点来完成一次行为</p>
+<h2 id="WaterMark"><a href="#WaterMark" class="headerlink" title="WaterMark"></a>WaterMark</h2><h3 id="WaterMark是什么"><a href="#WaterMark是什么" class="headerlink" title="WaterMark是什么"></a>WaterMark是什么</h3><p>Watermark 是协调窗口计算的一种方式，它告诉了算子时间不大于 WaterMark 的消息不应该再被接收【如果出现意味着延迟到达】。WaterMark 从源算子开始 emit，并逐级向下游算子传递，算子需要依据自己的缓存策略在适当的时机将 WaterMark 传递到下游。当源算子关闭时，会发射一个携带 <code>Long.MAX_VALUE</code> 值时间戳的 WaterMark，下游算子接收到之后便知道不会再有消息到达。</p>
+<p>Flink 提供三种消息时间特性：EventTime【消息产生的时间】、ProcessingTime【消息处理时间】 和 IngestionTime【消息流入 flink 框架的时间】，WaterMark 只在时间特性 EventTime 和 IngestionTime 起作用，并且 IngestionTime 的时间等同于消息的 ingestion 时间。</p>
+<h3 id="WaterMark的协调与分发"><a href="#WaterMark的协调与分发" class="headerlink" title="WaterMark的协调与分发"></a>WaterMark的协调与分发</h3><p>对于 watermark 的协调与分发集中在 InputProcessor 的 processInput 方法中，下面我们来详细分析其逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//StreamInputProcessor line134</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">processInput</span><span class="params">(OneInputStreamOperator&lt;IN, ?&gt; streamOperator, <span class="keyword">final</span> Object lock)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (isFinished) &#123;</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">if</span> (numRecordsIn == <span class="keyword">null</span>) &#123;</div><div class="line">			numRecordsIn = streamOperator.getMetricGroup().counter(<span class="string">"numRecordsIn"</span>);</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			<span class="keyword">if</span> (currentRecordDeserializer != <span class="keyword">null</span>) &#123;</div><div class="line">				DeserializationResult result = currentRecordDeserializer.getNextRecord(deserializationDelegate);</div><div class="line"></div><div class="line">				<span class="keyword">if</span> (result.isBufferConsumed()) &#123;</div><div class="line">					currentRecordDeserializer.getCurrentBuffer().recycle();</div><div class="line">					currentRecordDeserializer = <span class="keyword">null</span>;</div><div class="line">				&#125;</div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>如果消费到的消息是一个 WaterMark，获得其对应的 source channel id 并将时间更新进去，同时记录下当前所有 channel 的最小 WaterMark 时间</li>
+<li>如果当前最小 WaterMark 时间【所有的 channel 都至少消费到该时间】大于上次发射给下游的 WaterMark 时间，则更新 WaterMark 时间并将其交给算子处理</li>
+<li>通常算子在处理【尤其是涉及了窗口计算或者需要时间缓存策略的算子】后会将 WaterMark 继续往下游广播发送</li>
+</ul>
+<h3 id="WaterMark-的来源"><a href="#WaterMark-的来源" class="headerlink" title="WaterMark 的来源"></a>WaterMark 的来源</h3><p>上面我们提到 WaterMark 最初由源算子负责发射到下游，那么它的生成规则是什么呢？又是如何协调的？</p>
+<p><em>我们来看一个源算子的实现便知</em></p>
+<p>在第一章 flink 逻辑计划生成，我们了解了 flink 所有的源算子都继承自 SourceFunction 接口，SourceFuntion 定义了管理消息发射环境的接口 SourceContext，SourceContext 的具体实现在 StreamSource 中，一共有三种：NonTimestampContext、AutomaticWatermarkContext、ManualWatermarkContext，我们来逐一分析。</p>
+<h4 id="NonTimestampContext"><a href="#NonTimestampContext" class="headerlink" title="NonTimestampContext"></a>NonTimestampContext</h4><p>适用于时间特性：TimeCharacteristic#ProcessingTime，顾名思义，不会 emit 任何 WaterMark</p>
+<h4 id="AutomaticWatermarkContext"><a href="#AutomaticWatermarkContext" class="headerlink" title="AutomaticWatermarkContext"></a>AutomaticWatermarkContext</h4><p>自动发射 WaterMark，适用于 TimeCharacteristic#IngestionTime ，也就是源算子的处理时间。flink 起了一个timer task 专门以一定的 interval 间隔发射 WaterMark，一个 Interval 内所有 Record 的发射时间处于上次 emit 的 WaterMark 和下次将要 emit 的 WaterMark 之间，Interval 边界到达后会提升下一个 WaterMark 时间，计算本次的 WaterMark 时间并 emit 出去。</p>
+<p>自动 emit watermark 的 interval 默认是 200ms ，这是写死不可配置的，具体见：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//StreamExecutionEnvironment line598</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setStreamTimeCharacteristic</span><span class="params">(TimeCharacteristic characteristic)</span> </span>&#123;</div><div class="line">		<span class="keyword">this</span>.timeCharacteristic = Preconditions.checkNotNull(characteristic);</div><div class="line">		<span class="keyword">if</span> (characteristic == TimeCharacteristic.ProcessingTime) &#123;</div><div class="line">			getConfig().setAutoWatermarkInterval(<span class="number">0</span>);</div><div class="line">		&#125; <span class="keyword">else</span> &#123;</div><div class="line">			getConfig().setAutoWatermarkInterval(<span class="number">200</span>);</div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<h4 id="ManualWatermarkContext"><a href="#ManualWatermarkContext" class="headerlink" title="ManualWatermarkContext"></a>ManualWatermarkContext</h4><p>用户自己指定 WaterMark 时间，使用于 TimeCharacteristic#EventTime，用户需要提供依据源消息提取 Watermark 时间的工具 function</p>
+<p><em>那么用户有哪些指定时间的逻辑呢？</em></p>
+<h5 id="TimestampAssigner"><a href="#TimestampAssigner" class="headerlink" title="TimestampAssigner"></a>TimestampAssigner</h5><p>flink 通过接口 TimestampAssigner 来让用户依据消息的格式自己抽取可能被用于 WaterMark 的 timestamp，它只定义了一个接口：<code>long extractTimestamp(T element, long previousElementTimestamp);</code></p>
+<p>而 TimestampAssigner 的两个继承接口 AssignerWithPunctuatedWatermarks 以及 AssignerWithPeriodicWatermarks 定义了另种典型的时间戳生成规则：</p>
+<ul>
+<li>AssignerWithPunctuatedWatermarks：依据消息中事件元素及自带 timestamp 来驱动 watermark 的递增</li>
+<li>AssignerWithPeriodicWatermarks：依据消息中的 timestamp 周期性地驱动 watermark 的递增</li>
+</ul>
+<p>各个场景可以依据业务的需求去继承和实现</p>
+<h2 id="Checkpoint"><a href="#Checkpoint" class="headerlink" title="Checkpoint"></a>Checkpoint</h2><p>CheckPoint 是 flink 保证消息不丢的机制，通过 Barrier 的方式来协调时机，那么什么是 Barrier 呢？</p>
+<p>其实前一章介绍 flink 网络栈 的时候已经有介绍在消费端 flink 对于不同的 Barrier 处理，实际上，Barrier 是用来校准 checkpint 的方式。由于对于一个拓扑结构，只有上游算子 checkpoint 完，下游算子的 cehckpoint 才能开始并有意义，同时下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 Barrier 就是这样一种协调上下游算子的机制。</p>
+<p>JobManager 统一通知源算子发射 Barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】</p>
+<p>当下游算子收到了它所有的 InputChannel 的 Barrier 事件后，它便知道上游算子的一次 checkpoint 已完成，自己也可以做 checkpoint 了，完成之后继续将 checkpoint 事件广播到下游算子</p>
+<p>在 Exact-once 语义下，消费端会延迟消费并校准不同 channel 的消费速率，这在 flink 网络栈一章有详细介绍！</p>
+<h3 id="Checkpoint-的协调与发起"><a href="#Checkpoint-的协调与发起" class="headerlink" title="Checkpoint 的协调与发起"></a>Checkpoint 的协调与发起</h3><p>前面提到过 checkpoint 统一由 JobManager 发起，我们来看相关逻辑：</p>
+<h4 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h4><p>flink 的 checkpoint 统一由 CheckpointCoordinator 来协调，通过将 checkpoint 命令事件发送给相关的 tasks 【源 tasks】，它发起 checkpoint 并且收集 checkpoint 的 ack 消息。</p>
+<h5 id="构造参数"><a href="#构造参数" class="headerlink" title="构造参数"></a>构造参数</h5><p>这里有必要了解一些关键参数，以便我们更加了解 Checkpoint 的细节策略</p>
+<ul>
+<li>baseInternal：快照的间隔</li>
+<li>checkpointTimeout：一次 checkpoint 的超时时间，超时的 checkpoint 会被取消</li>
+<li>maxConcurrentCheckpointAttempts：最多可同时存在的 checkpoint 任务，是对于整个 flink job</li>
+<li>tasksToTrigger：触发分布式 Checkpoint 的起始 tasks，也就是 source tasks</li>
+</ul>
+<h5 id="Checkpoint的发起"><a href="#Checkpoint的发起" class="headerlink" title="Checkpoint的发起"></a>Checkpoint的发起</h5><p>前面的章节我们介绍过 ExecutionGraph【flink物理计划抽象】，它有一个核心接口 <code>enableSnapshotCheckpointing</code> ，这个接口在 JobManager 提交作业的时候被执行，具体见<code>JobManager line1238 from method submitJob</code>。这个接口的逻辑总结如下：</p>
+<ul>
+<li>获取 checkpoint 的发起节点【源节点】，需要 ack 和 commit 的节点【所有节点】</li>
+<li>先关闭已有 checkpoint</li>
+<li>实例化 CheckpointCoordinator 和它的监听 Akka 系统 CheckpointCoordinatorDeActivator，并将 CheckpointCoordinatorDeActivator 注册为 EecutionGraph 的 listener，当作业的执行状态变为 RUNNING 时，会通知 CheckpointCoordinatorDeActivator 启动 CheckpointCoordinator 的 checkpoint 线程</li>
+</ul>
+<p><em>那么 CheckpointCoordinator 在收到这样的消息后会怎么处理呢？</em></p>
+<p>它会发起一个 timer task，定时执行，并且传入的时间为当前的系统时间，由于 CheckpointCoordinator 全局只有一个，这个时间也是全局递增并且唯一的：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line 1020</span></div><div class="line"><span class="keyword">private</span> <span class="class"><span class="keyword">class</span> <span class="title">ScheduledTrigger</span> <span class="keyword">extends</span> <span class="title">TimerTask</span> </span>&#123;</div><div class="line"></div><div class="line">		<span class="meta">@Override</span></div><div class="line">		<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				triggerCheckpoint(System.currentTimeMillis());</div><div class="line">			&#125;</div><div class="line">			<span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">				LOG.error(<span class="string">"Exception while triggering checkpoint"</span>, e);</div><div class="line">			&#125;</div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<p><em>下面我们来具体分析 checkpoint 的一些核心动作</em></p>
+<h6 id="checkpoint-的触发"><a href="#checkpoint-的触发" class="headerlink" title="checkpoint 的触发"></a>checkpoint 的触发</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line389</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">triggerCheckpoint</span><span class="params">(<span class="keyword">long</span> timestamp, <span class="keyword">long</span> nextCheckpointId)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="comment">// make some eager pre-checks</span></div><div class="line">		<span class="keyword">synchronized</span> (lock) &#123;</div><div class="line">			<span class="comment">// abort if the coordinator has been shutdown in the meantime</span></div><div class="line">			<span class="keyword">if</span> (shutdown) &#123;</div><div class="line">				<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">			&#125;</div><div class="line"><span class="comment">//...</span></div></pre></td></tr></table></figure>
+<p>总结逻辑：</p>
+<ul>
+<li>如果已关闭或优先处理排队请求会总额并发任务超过限制，都会取消此次 checkpoint 的发起</li>
+<li>如果最小间隔时间未达到，也会取消此次 checkpoint</li>
+<li>check 所有的发起节点【源节点】与其他节点都为 RUNNING 状态后才会发起 checkpoint</li>
+<li>发起 checkpoint 并生成一个 PendingCheckpoint 【已经发起但尚未 ack 的 checkpoint】</li>
+<li>每个源节点都会发一条消息给自己的 TaskManager 进行 checkpoint</li>
+</ul>
+<h6 id="取消-CheckPoint-消息的处理"><a href="#取消-CheckPoint-消息的处理" class="headerlink" title="取消 CheckPoint 消息的处理"></a>取消 CheckPoint 消息的处理</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line568</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">receiveDeclineMessage</span><span class="params">(DeclineCheckpoint message)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   <span class="keyword">if</span> (shutdown || message == <span class="keyword">null</span>) &#123;</div><div class="line">      <span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">if</span> (!job.equals(message.getJob())) &#123;</div><div class="line">      LOG.error(<span class="string">"Received DeclineCheckpoint message for wrong job: &#123;&#125;"</span>, message);</div><div class="line">      <span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">   &#125;</div><div class="line"><span class="comment">//...</span></div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>如果有对应的 PendingCheckpoint ，取消掉并且如果在其之后还有其它 checkpoint 的话，重新发起它们的 checkpoint 任务</li>
+</ul>
+<h6 id="Ack-Checkpoint-消息的处理"><a href="#Ack-Checkpoint-消息的处理" class="headerlink" title="Ack Checkpoint 消息的处理"></a>Ack Checkpoint 消息的处理</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line651</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">receiveAcknowledgeMessage</span><span class="params">(AcknowledgeCheckpoint message)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (shutdown || message == <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">if</span> (!job.equals(message.getJob())) &#123;</div><div class="line">			LOG.error(<span class="string">"Received AcknowledgeCheckpoint message for wrong job: &#123;&#125;"</span>, message);</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>通过消息里的 checkpoint id 找到对应的  PendingCheckpoint，记录下 对应的 JobVertex 下某个 ExecutionVertex 的 ack 状态</li>
+<li>PendingCheckpoint 里维护了该次 checkpoint 需要 ack 的全部 ExecutionVertex</li>
+<li>如果全部 ack 完成，则清除 PendingCheckpoint 里维护的状态数据并将句柄转化给 CompletedCheckpoint 来维护</li>
+<li>丢弃过时的 checkpoint 任务，并重新出发新的 checkpoint</li>
+<li>如果全部 ack 完成，通知对应的 TaskManager checkpoint 已完成【checkpoint commit 阶段】，然后通过 CompletedCheckpointStore 将 CompletedCheckpoint 序列化并存储，高可用模式下为 ZK 的方式，具体细节见章节：【flink job manager 基本组件】，将来恢复时，将每个节点需要的句柄注入到状态中，之后算子启动时将状态数据附属于 TaskDeploymentDescriptor 之中分发给 TaskManager 去执行</li>
+</ul>
+<h3 id="Checkpoint-的消息流"><a href="#Checkpoint-的消息流" class="headerlink" title="Checkpoint 的消息流"></a>Checkpoint 的消息流</h3><p>上面我们说到 TaskManager 收到 AbstractCheckpointMessage 消息，并处理，我们来看核心逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//TaskManager line520</span></div><div class="line"><span class="function"><span class="keyword">private</span> def <span class="title">handleCheckpointingMessage</span><span class="params">(actorMessage: AbstractCheckpointMessage)</span>: Unit </span>= &#123;</div><div class="line"></div><div class="line">    actorMessage match &#123;</div><div class="line">      <span class="keyword">case</span> message: TriggerCheckpoint =&gt;</div><div class="line">        val taskExecutionId = message.getTaskExecutionId</div><div class="line">        val checkpointId = message.getCheckpointId</div><div class="line">        val timestamp = message.getTimestamp</div><div class="line"></div><div class="line">        log.debug(s<span class="string">"Receiver TriggerCheckpoint $checkpointId@$timestamp for $taskExecutionId."</span>)</div><div class="line"></div><div class="line"><span class="comment">//...</span></div><div class="line"><span class="comment">//Task.java line927</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">triggerCheckpointBarrier</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> checkpointID, <span class="keyword">final</span> <span class="keyword">long</span> checkpointTimestamp)</span> </span>&#123;</div><div class="line">		AbstractInvokable invokable = <span class="keyword">this</span>.invokable;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (executionState == ExecutionState.RUNNING &amp;&amp; invokable != <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">if</span> (invokable <span class="keyword">instanceof</span> StatefulTask) &#123;</div><div class="line"></div><div class="line">				<span class="comment">// build a local closure</span></div><div class="line">				<span class="keyword">final</span> StatefulTask&lt;?&gt; statefulTask = (StatefulTask&lt;?&gt;) invokable;</div><div class="line">				<span class="keyword">final</span> String taskName = taskNameWithSubtask;       </div><div class="line"></div><div class="line"><span class="comment">//...</span></div><div class="line"><span class="comment">//StreamTask line577</span></div><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">boolean</span> <span class="title">performCheckpoint</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> checkpointId, <span class="keyword">final</span> <span class="keyword">long</span> timestamp)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		LOG.debug(<span class="string">"Starting checkpoint &#123;&#125; on task &#123;&#125;"</span>, checkpointId, getName());</div><div class="line"></div><div class="line">		<span class="keyword">synchronized</span> (lock) &#123;</div><div class="line">			<span class="keyword">if</span> (isRunning) &#123;</div></pre></td></tr></table></figure>
+<p>总结其逻辑：</p>
+<ul>
+<li>先是通过 TaskManager 进行消息路由，对于 TriggerCheckpoint 消息，会路由给相应的 Task 做处理</li>
+<li>Task 会起一个异步 task 进行 checkpoint，内部是调用 StreamTask 的 performCheckpoint 方法</li>
+<li>performCheckpoint 内部首先先将此次 checkpoint 的 barrier 广播到下游，以便让下游快速 checkpoint</li>
+<li>后执行具体的 checkpoint，将状态持久化，目前支持的持久化方式有：FileSystem、Memory、RocksDB，成功后通知 JobManager 进行 ack，否则取消此次 checkpoint</li>
+<li>如果是 ack 消息，依据具体情况通知对应的 KVState</li>
+</ul>
+<p>附一张图描述交互过程：</p>
+<p><img src="checkpoint-event-flow.png" alt="checkpoint-event-flow.png"></p>
+<h3 id="Checkpoint-的存储和恢复"><a href="#Checkpoint-的存储和恢复" class="headerlink" title="Checkpoint 的存储和恢复"></a>Checkpoint 的存储和恢复</h3><p>Checkpoint 的存储和恢复均是通过 AbstractStateBackend 来完成，AbstractStateBackend 有三个实现类，FsStateBackend 是通过 HDFS 来存储 checkpoint 状态，继承关系如下：</p>
+<p><img src="state-backend-extend.png" alt="state-backend-extend.png"></p>
+<p><em>我们来看最常见的一种 FsStateBackend</em>，AbstractStateBackend 内部通过 State 来管理状态数据，依据状态数据的不同特性，状态分为三种：</p>
+<ul>
+<li>ValueState ：最简单的状态，一个 key 一个单值 value，可以跟更新和删除</li>
+<li>ListState：一个 key 对应一个 value list</li>
+<li>ReducingState：一个 key 对应的 value 可以进行 reduce 操作</li>
+<li>FoldingState：一个key，后续添加的值都会通过 folding 函数附加到第一个值上</li>
+</ul>
+<p>AbstractStateBackend 内部通过 KvState 接口来管理用户自定义的 kv 数据，我们来看 FsValueState 的继承关系：</p>
+<p><img src="value-state-extend.png" alt="value-state-extend.png"></p>
+<p>那么如何获取这些 State 呢？flink 抽象了另一套接口：StateDescriptor 来获取 State，通过绑定特定的 StateBackend 来获取。这样一层抽象，解耦了 State 的类型和底层的具体的存储实现。我们来看 StateDescriptor 的继承关系：</p>
+<p><img src="state-describtor.png" alt="state-describtor.png"></p>
+<p>那么这些抽象是如何协调工作的呢？</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//KvState 的初始化和获取</span></div><div class="line"><span class="comment">//AbstractKeyedCEPPatternOperator line93</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">open</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (keys == <span class="keyword">null</span>) &#123;</div><div class="line">			keys = <span class="keyword">new</span> HashSet&lt;&gt;();</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (nfaOperatorState == <span class="keyword">null</span>) &#123;</div><div class="line">			nfaOperatorState = getPartitionedState(</div><div class="line">					<span class="keyword">new</span> ValueStateDescriptor&lt;NFA&lt;IN&gt;&gt;(</div><div class="line">						NFA_OPERATOR_STATE_NAME,</div><div class="line">						<span class="keyword">new</span> NFA.Serializer&lt;IN&gt;(),</div><div class="line">						<span class="keyword">null</span>));</div><div class="line">		&#125;</div><div class="line"></div><div class="line"><span class="comment">//AbstractStreamOperator line273</span></div><div class="line"><span class="keyword">protected</span> &lt;S extends State&gt; <span class="function">S <span class="title">getPartitionedState</span><span class="params">(StateDescriptor&lt;S, ?&gt; stateDescriptor)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">return</span> getStateBackend().getPartitionedState(<span class="keyword">null</span>, VoidSerializer.INSTANCE, stateDescriptor);</div><div class="line">	&#125;</div><div class="line"></div><div class="line"><span class="comment">//AbstractStateBackend line205</span></div><div class="line"><span class="comment">//具体的 kvState 由子类具体实现来决定</span></div><div class="line"><span class="keyword">public</span> &lt;N, S extends State&gt; <span class="function">S <span class="title">getPartitionedState</span><span class="params">(<span class="keyword">final</span> N namespace, <span class="keyword">final</span> TypeSerializer&lt;N&gt; namespaceSerializer, <span class="keyword">final</span> StateDescriptor&lt;S, ?&gt; stateDescriptor)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (keySerializer == <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"State key serializer has not been configured in the config. "</span> +</div><div class="line">					<span class="string">"This operation cannot use partitioned state."</span>);</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (!stateDescriptor.isSerializerInitialized()) &#123;</div><div class="line">			stateDescriptor.initializeSerializerUnlessSet(<span class="keyword">new</span> ExecutionConfig());</div><div class="line">		&#125;</div><div class="line"><span class="comment">//获取 KvState 后，用户经过一番更新...下面是快照的过程</span></div><div class="line"><span class="comment">// StateBackend 的创建</span></div><div class="line"><span class="comment">//AbstractStreamOperator line114</span></div><div class="line"><span class="keyword">try</span> &#123;</div><div class="line">			TypeSerializer&lt;Object&gt; keySerializer = config.getStateKeySerializer(getUserCodeClassloader());</div><div class="line">			<span class="comment">// if the keySerializer is null we still need to create the state backend</span></div><div class="line">			<span class="comment">// for the non-partitioned state features it provides, such as the state output streams</span></div><div class="line">			String operatorIdentifier = getClass().getSimpleName() + <span class="string">"_"</span> + config.getVertexID() + <span class="string">"_"</span> + runtimeContext.getIndexOfThisSubtask();</div><div class="line">			stateBackend = container.createStateBackend(operatorIdentifier, keySerializer);</div><div class="line">		&#125; <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"Could not initialize state backend. "</span>, e);</div><div class="line">		&#125;</div><div class="line"><span class="comment">//StreamTask line102</span></div><div class="line"><span class="function"><span class="keyword">public</span> AbstractStateBackend <span class="title">createStateBackend</span><span class="params">(String operatorIdentifier, TypeSerializer&lt;?&gt; keySerializer)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		AbstractStateBackend stateBackend = configuration.getStateBackend(userClassLoader);</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (stateBackend != <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="comment">// backend has been configured on the environment</span></div><div class="line">			LOG.info(<span class="string">"Using user-defined state backend: "</span> + stateBackend);</div><div class="line">		&#125;</div><div class="line"><span class="comment">//快照入口</span></div><div class="line"><span class="comment">//AbstractStreamOperator line179</span></div><div class="line"><span class="function"><span class="keyword">public</span> StreamTaskState <span class="title">snapshotOperatorState</span><span class="params">(<span class="keyword">long</span> checkpointId, <span class="keyword">long</span> timestamp)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="comment">// here, we deal with key/value state snapshots</span></div><div class="line"></div><div class="line">		StreamTaskState state = <span class="keyword">new</span> StreamTaskState();</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (stateBackend != <span class="keyword">null</span>) &#123;</div><div class="line">			HashMap&lt;String, KvStateSnapshot&lt;?, ?, ?, ?, ?&gt;&gt; partitionedSnapshots =</div><div class="line">				stateBackend.snapshotPartitionedState(checkpointId, timestamp);</div><div class="line">			<span class="keyword">if</span> (partitionedSnapshots != <span class="keyword">null</span>) &#123;</div><div class="line">				state.setKvStates(partitionedSnapshots);</div><div class="line">			&#125;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">return</span> state;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
+<p>上面的快照之行结束后，用户会获取 KvStateSnapshot 抽象，对于 FsState 来说，起内部封装了文件句柄以及序列化元数据等信息，同时提供了恢复快照的接口，其抽象关系如下：</p>
+<p><img src="fs-snapshort-extend.png" alt="fs-snapshort-extend.png"></p>
+<p>flink  进一步将每个 task 的每个 operator 快照后获取的 KvStateSnapshot 封装成 StreamTaskState，并最终获取一个 StreamTaskState List【对应一个 task 的一组 operators】，分装成 StreamTaskStateList，随后通知 JobManager 的 CheckpointCoordinator：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//RuntimeEnvironment line260</span></div><div class="line">AcknowledgeCheckpoint message = <span class="keyword">new</span> AcknowledgeCheckpoint(</div><div class="line">				jobId,</div><div class="line">				executionId,</div><div class="line">				checkpointId,</div><div class="line">				serializedState,</div><div class="line">				stateSize);</div><div class="line"></div><div class="line">		jobManager.tell(message);</div></pre></td></tr></table></figure>
+<p>JobManager  再将这些句柄的数据再快照到本地和zk，具体见 JobManager 基本组件。恢复的过程是逆向的，暂时就不分析了，有耐心的用户可以自行查看源码!</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+  <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+    <div>生活不止眼前的苟且！</div>
+    <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+      <span>赏</span>
+    </button>
+    <div id="QR" style="display: none;">
+      
+        <div id="wechat" style="display: inline-block">
+          <img id="wechat_qr" src="/images/wechat-reward-image.png" alt="chenyuzhao WeChat Pay"/>
+          <p>微信打赏</p>
+        </div>
+      
+      
+    </div>
+  </div>
+
+
+      
+    </div>
+
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/flink/" rel="tag"># flink</a>
+          
+            <a href="/tags/watermark/" rel="tag"># watermark</a>
+          
+            <a href="/tags/checkpoint/" rel="tag"># checkpoint</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/02/09/flink网络栈/" rel="next" title="flink 网络栈">
+                <i class="fa fa-chevron-left"></i> flink 网络栈
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/02/09/flink-scheduler/" rel="prev" title="flink scheduler">
+                flink scheduler <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+          
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div id="disqus_thread">
+        <noscript>
+          Please enable JavaScript to view the
+          <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+        </noscript>
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/images/avatar.png"
+               alt="chenyuzhao" />
+          <p class="site-author-name" itemprop="name">chenyuzhao</p>
+          <p class="site-description motion-element" itemprop="description">本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~</p>
+        </div>
+        <nav class="site-state motion-element">
+        
+          
+            <div class="site-state-item site-state-posts">
+              <a href="/archives">
+                <span class="site-state-item-count">9</span>
+                <span class="site-state-item-name">日志</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-categories">
+              
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">4</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+        </div>
+
+        
+        
+
+        
+        
+
+        
+
+
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WaterMark"><span class="nav-number">2.</span> <span class="nav-text">WaterMark</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#WaterMark是什么"><span class="nav-number">2.1.</span> <span class="nav-text">WaterMark是什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WaterMark的协调与分发"><span class="nav-number">2.2.</span> <span class="nav-text">WaterMark的协调与分发</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WaterMark-的来源"><span class="nav-number">2.3.</span> <span class="nav-text">WaterMark 的来源</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#NonTimestampContext"><span class="nav-number">2.3.1.</span> <span class="nav-text">NonTimestampContext</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#AutomaticWatermarkContext"><span class="nav-number">2.3.2.</span> <span class="nav-text">AutomaticWatermarkContext</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ManualWatermarkContext"><span class="nav-number">2.3.3.</span> <span class="nav-text">ManualWatermarkContext</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#TimestampAssigner"><span class="nav-number">2.3.3.1.</span> <span class="nav-text">TimestampAssigner</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Checkpoint"><span class="nav-number">3.</span> <span class="nav-text">Checkpoint</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Checkpoint-的协调与发起"><span class="nav-number">3.1.</span> <span class="nav-text">Checkpoint 的协调与发起</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#CheckpointCoordinator"><span class="nav-number">3.1.1.</span> <span class="nav-text">CheckpointCoordinator</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#构造参数"><span class="nav-number">3.1.1.1.</span> <span class="nav-text">构造参数</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#Checkpoint的发起"><span class="nav-number">3.1.1.2.</span> <span class="nav-text">Checkpoint的发起</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#checkpoint-的触发"><span class="nav-number">3.1.1.2.1.</span> <span class="nav-text">checkpoint 的触发</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#取消-CheckPoint-消息的处理"><span class="nav-number">3.1.1.2.2.</span> <span class="nav-text">取消 CheckPoint 消息的处理</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#Ack-Checkpoint-消息的处理"><span class="nav-number">3.1.1.2.3.</span> <span class="nav-text">Ack Checkpoint 消息的处理</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Checkpoint-的消息流"><span class="nav-number">3.2.</span> <span class="nav-text">Checkpoint 的消息流</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Checkpoint-的存储和恢复"><span class="nav-number">3.3.</span> <span class="nav-text">Checkpoint 的存储和恢复</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">chenyuzhao</span>
+</div>
+
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+
+        
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+  
+  <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.0"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.0"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.0"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.0"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.0"></script>
+
+
+
+  
+
+
+
+  
+
+    <script type="text/javascript">
+      var disqus_shortname = 'danny0405';
+      var disqus_identifier = '2017/02/09/flink-watermark-checkpoint/';
+
+      var disqus_title = "flink watermark and checkpoint";
+
+
+      function run_disqus_script(disqus_script) {
+        var dsq = document.createElement('script');
+        dsq.type = 'text/javascript';
+        dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/' + disqus_script;
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      }
+
+      run_disqus_script('count.js');
+
+      
+        var disqus_config = function () {
+            this.page.url = disqus_url;
+            this.page.identifier = disqus_identifier;
+            this.page.title = disqus_title;
+        };
+        run_disqus_script('embed.js');
+      
+
+    </script>
+  
+
+
+
+
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+      search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+      'use strict';
+      $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+          // get the contents from search data
+          isfetched = true;
+          $('.popup').detach().appendTo('.header-inner');
+          var datas = $( "entry", xmlResponse ).map(function() {
+            return {
+              title: $( "title", this ).text(),
+              content: $("content",this).text(),
+              url: $( "url" , this).text()
+            };
+          }).get();
+          var $input = document.getElementById(search_id);
+          var $resultContent = document.getElementById(content_id);
+          $input.addEventListener('input', function(){
+            var matchcounts = 0;
+            var str='<ul class=\"search-result-list\">';
+            var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+            $resultContent.innerHTML = "";
+            if (this.value.trim().length > 1) {
+              // perform local searching
+              datas.forEach(function(data) {
+                var isMatch = false;
+                var content_index = [];
+                var data_title = data.title.trim().toLowerCase();
+                var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                var data_url = decodeURIComponent(data.url);
+                var index_title = -1;
+                var index_content = -1;
+                var first_occur = -1;
+                // only match artiles with not empty titles and contents
+                if(data_title != '') {
+                  keywords.forEach(function(keyword, i) {
+                    index_title = data_title.indexOf(keyword);
+                    index_content = data_content.indexOf(keyword);
+                    if( index_title >= 0 || index_content >= 0 ){
+                      isMatch = true;
+                      if (i == 0) {
+                        first_occur = index_content;
+                      }
+                    }
+
+                  });
+                }
+                // show search results
+                if (isMatch) {
+                  matchcounts += 1;
+                  str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                  var content = data.content.trim().replace(/<[^>]+>/g,"");
+                  if (first_occur >= 0) {
+                    // cut out 100 characters
+                    var start = first_occur - 20;
+                    var end = first_occur + 80;
+                    if(start < 0){
+                      start = 0;
+                    }
+                    if(start == 0){
+                      end = 50;
+                    }
+                    if(end > content.length){
+                      end = content.length;
+                    }
+                    var match_content = content.substring(start, end);
+                    // highlight all keywords
+                    keywords.forEach(function(keyword){
+                      var regS = new RegExp(keyword, "gi");
+                      match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                    });
+
+                    str += "<p class=\"search-result\">" + match_content +"...</p>"
+                  }
+                  str += "</li>";
+                }
+              })};
+            str += "</ul>";
+            if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+            if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+            $resultContent.innerHTML = str;
+          });
+          proceedsearch();
+        }
+      });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').click(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+
+  
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("IHwwV5iwSmi4anND94SPVRfX-gzGzoHsz", "HA0GffL0nVFkTaYDd2HVvyyN");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+          for(var i = 0; i < entries.length; i++) {
+            var url = entries[i];
+            var element = document.getElementById(url);
+            var countSpan = $(element).find(COUNT_CONTAINER_REF);
+            if( countSpan.text() == '') {
+              countSpan.text(0);
+            }
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            /* Set ACL */
+            var acl = new AV.ACL();
+            acl.setPublicReadAccess(true);
+            acl.setPublicWriteAccess(true);
+            newcounter.setACL(acl);
+            /* End Set ACL */
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+
+  
+
+
+</body>
+</html>
