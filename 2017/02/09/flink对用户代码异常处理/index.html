@@ -94,7 +94,7 @@
 <meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/index.html">
 <meta property="og:site_name" content="玉兆的博客">
 <meta property="og:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
-<meta property="og:updated_time" content="2017-02-09T05:56:14.000Z">
+<meta property="og:updated_time" content="2017-02-13T13:32:37.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="flink 对用户代码异常处理">
 <meta name="twitter:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
@@ -419,11 +419,11 @@
 
       
         <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？</p>
-<h2 id="异常后的组件通信"><a href="#异常后的组件通信" class="headerlink" title="异常后的组件通信"></a>异常后的组件通信</h2><p>flink 的 task 的 Runnable 类是 Task.java，我们观察到它的 <code>run()</code> 方法真个被一个大的 try catch 包住，我们重点关注 catch 用户异常之后的部分：</p>
+<h2 id="异常后的组件通信"><a href="#异常后的组件通信" class="headerlink" title="异常后的组件通信"></a>异常后的组件通信</h2><p>一个 flink task 的线程 Runnable 类是 Task.java，我们观察到它的 <code>run()</code> 方法整个被一个大的 try catch 包住，这里重点关注 catch 用户异常之后的部分：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//Task line612</span></div><div class="line">		<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line"></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line">			<span class="comment">// the execution failed. either the invokable code properly failed, or</span></div><div class="line">			<span class="comment">// an exception was thrown as a side effect of cancelling</span></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line"></div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				<span class="comment">// transition into our final state. we should be either in DEPLOYING, RUNNING, CANCELING, or FAILED</span></div><div class="line">				<span class="comment">// loop for multiple retries during concurrent state changes via calls to cancel() or</span></div><div class="line">				<span class="comment">// to failExternally()</span></div><div class="line">				<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">					ExecutionState current = <span class="keyword">this</span>.executionState;</div></pre></td></tr></table></figure>
 <p>简单总结其逻辑：</p>
 <ul>
-<li><p>如果当前的执行状态是 <code>ExecutionState.RUNNING</code> 或者 <code>ExecutionState.DEPLOYING</code>，表明是从正常运行到异常状态的过度，这时候判断是主动 Cancel 执行，如果是，执行 StreamTask 的 cancel 方法， 并通知观察者它的状态已变成：<code>ExecutionState.CANCELED</code>；如果不是主动 Cancel，表明是用户异常触发，这时候同样执行 StreamTask 的 cancel 方法，然后通知观察者它的状态变成：<code>ExecutionState.FAILED</code>，这里的 cancel 方法留给 flink 内部的算子来实现，对于普通 task ，会停止消费上游数据，对于 source task，会停止发送源数据</p>
+<li><p>如果当前的执行状态是 <code>ExecutionState.RUNNING</code> 或者 <code>ExecutionState.DEPLOYING</code>，表明是从正常运行到异常状态的过度，这时候判断是否是主动 Cancel 执行，如果是主动 Cancel，执行 StreamTask 的 <code>cancel()</code> 方法， 并通知观察者它的状态已变成：<code>ExecutionState.CANCELED</code>；如果不是主动 Cancel，表明是用户异常触发，这时候同样执行 StreamTask 的 <code>cancel()</code> 方法，然后通知观察者它的状态变成：<code>ExecutionState.FAILED</code>，这里的 cancel 方法留给 flink 内部的算子来实现，对于普通 task ，会停止消费上游数据，对于 source task，会停止发送源数据</p>
 </li>
 <li><p>对于用户异常来说，通知观察者的状态应该为 <code>ExecutionState.FAILED</code>，<em>我们下面详细分析</em></p>
 </li>

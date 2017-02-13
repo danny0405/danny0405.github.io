@@ -88,19 +88,19 @@
 
 
 
-<meta name="description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 task 的运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
+<meta name="description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
 <meta property="og:type" content="article">
 <meta property="og:title" content="taskmanager 基本组件">
 <meta property="og:url" content="https://danny0405.github.io/2017/02/09/taskmanager基本组件/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 task 的运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
+<meta property="og:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
 <meta property="og:image" content="https://danny0405.github.io/memory-segment-extend.png">
 <meta property="og:image" content="https://danny0405.github.io/file-channel-entend.png">
 <meta property="og:image" content="https://danny0405.github.io/io-manager-async.png">
-<meta property="og:updated_time" content="2017-02-09T04:46:18.000Z">
+<meta property="og:updated_time" content="2017-02-13T13:34:57.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="taskmanager 基本组件">
-<meta name="twitter:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 task 的运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
+<meta name="twitter:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
 <meta name="twitter:image" content="https://danny0405.github.io/memory-segment-extend.png">
 
 
@@ -407,7 +407,7 @@
 
           
               <div class="post-description">
-                  TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 task 的运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展
+                  TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展
               </div>
           
 
@@ -422,7 +422,7 @@
       
 
       
-        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 task 的运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展</p>
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展</p>
 <h2 id="MemoryManager"><a href="#MemoryManager" class="headerlink" title="MemoryManager"></a>MemoryManager</h2><p><em>先来翻译一下类的 JavaDoc ^_^</em></p>
 <p>MemoryManager 统一管理了 flink 的内存使用，内存被划分为相同大小的 segment，通过申请不同数量的 segment 来分配不同大小的内存</p>
 <p>这里支持两种内存：on-heap 内存和 off-heap 内存，通过参数可以控制分配内存的种类</p>
