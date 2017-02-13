@@ -198,10 +198,10 @@
     <link href="https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/"/>
     <id>https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/</id>
     <published>2017-02-09T05:44:06.000Z</published>
-    <updated>2017-02-09T05:46:45.000Z</updated>
+    <updated>2017-02-13T13:39:58.000Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起</p>
-<p>为什么将 Watermark 和 Checkpoint 放在一起将，是因为它们在原理上有相似之处：上游节点逐级广播消息给下游节点来完成一次行为</p>
+<p>为什么将 Watermark 和 Checkpoint 放在一起介绍，是因为它们在原理上有相似之处：上游节点逐级广播消息给下游节点来完成一次行为</p>
 <h2 id="WaterMark"><a href="#WaterMark" class="headerlink" title="WaterMark"></a>WaterMark</h2><h3 id="WaterMark是什么"><a href="#WaterMark是什么" class="headerlink" title="WaterMark是什么"></a>WaterMark是什么</h3><p>Watermark 是协调窗口计算的一种方式，它告诉了算子时间不大于 WaterMark 的消息不应该再被接收【如果出现意味着延迟到达】。WaterMark 从源算子开始 emit，并逐级向下游算子传递，算子需要依据自己的缓存策略在适当的时机将 WaterMark 传递到下游。当源算子关闭时，会发射一个携带 <code>Long.MAX_VALUE</code> 值时间戳的 WaterMark，下游算子接收到之后便知道不会再有消息到达。</p>
 <p>Flink 提供三种消息时间特性：EventTime【消息产生的时间】、ProcessingTime【消息处理时间】 和 IngestionTime【消息流入 flink 框架的时间】，WaterMark 只在时间特性 EventTime 和 IngestionTime 起作用，并且 IngestionTime 的时间等同于消息的 ingestion 时间。</p>
 <h3 id="WaterMark的协调与分发"><a href="#WaterMark的协调与分发" class="headerlink" title="WaterMark的协调与分发"></a>WaterMark的协调与分发</h3><p>对于 watermark 的协调与分发集中在 InputProcessor 的 processInput 方法中，下面我们来详细分析其逻辑：</p>
