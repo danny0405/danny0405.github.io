@@ -4,6 +4,50 @@
 
     
   <url>
+    <loc>https://danny0405.github.io/2017/03/29/flink-kafka-connector/</loc>
+    <lastmod>2017-03-29T10:43:28.000Z</lastmod>
+    <data>
+        <display>
+        <title>flink kafka connector 设计与实现</title>
+        <pubTime>2017-03-29T10:40:48.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+        <tag>kafka</tag>
+         
+         
+           
+             
+              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/03/29/flink-AsyncIO-%E5%89%96%E6%9E%90/</loc>
+    <lastmod>2017-03-29T10:32:33.000Z</lastmod>
+    <data>
+        <display>
+        <title>flink-AsyncIO-剖析</title>
+        <pubTime>2017-03-29T10:29:27.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+        <tag>async io</tag>
+         
+         
+           
+             
+              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
     <loc>https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/</loc>
     <lastmod>2017-02-13T13:39:58.000Z</lastmod>
     <data>

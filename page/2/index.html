@@ -91,7 +91,7 @@
 <meta name="description" content="本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~">
 <meta property="og:type" content="website">
 <meta property="og:title" content="玉兆的博客">
-<meta property="og:url" content="https://danny0405.github.io/tags/flink/index.html">
+<meta property="og:url" content="https://danny0405.github.io/page/2/index.html">
 <meta property="og:site_name" content="玉兆的博客">
 <meta property="og:description" content="本人喜好源码阅读，得益于目前的工作环境，对流式计算主流的框架较为了解，平常热衷于阅读一些内核的源码，希望分享出来与大家互动和交流，至于生活感悟，心灵鸡汤神马的就免了吧~">
 <meta name="twitter:card" content="summary">
@@ -124,13 +124,13 @@
 
 
 
-  <link rel="canonical" href="https://danny0405.github.io/tags/flink/"/>
+  <link rel="canonical" href="https://danny0405.github.io/page/2/"/>
 
 
 
 
 
-  <title> 标签: flink | 玉兆的博客 </title>
+  <title> 玉兆的博客 </title>
 </head>
 
 <body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
@@ -170,7 +170,9 @@
     
   
 
-  <div class="container one-collumn sidebar-position-left  ">
+  <div class="container one-collumn sidebar-position-left 
+   page-home 
+ ">
     <div class="headband"></div>
 
     <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
@@ -284,301 +286,179 @@
         <div class="content-wrap">
           <div id="content" class="content">
             
+  <section id="posts" class="posts-expand">
+    
+      
 
-  <div id="posts" class="posts-collapse">
-    <div class="collection-title">
-      <h2 >
-        flink
-        <small>标签</small>
-      </h2>
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/">
+
+  <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <meta itemprop="name" content="chenyuzhao">
+    <meta itemprop="description" content="">
+    <meta itemprop="image" content="/images/avatar.png">
+  </span>
+
+  <span style="display:none" itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+    <meta itemprop="name" content="玉兆的博客">
+    <span style="display:none" itemprop="logo" itemscope itemtype="http://schema.org/ImageObject">
+      <img style="display:none;" itemprop="url image" alt="玉兆的博客" src="">
+    </span>
+  </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/12/03/Flink基本组件和逻辑计划/" itemprop="url">
+                  flink 集群构建/逻辑计划
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2016-12-03T11:59:30+08:00">
+                2016-12-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Streaming/" itemprop="url" rel="index">
+                    <span itemprop="name">Streaming</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2016/12/03/Flink基本组件和逻辑计划/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2016/12/03/Flink基本组件和逻辑计划/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2016/12/03/Flink基本组件和逻辑计划/" class="leancloud_visitors" data-flag-title="flink 集群构建/逻辑计划">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数 </span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          Flink 源码，包括基本组件和客户端逻辑计划的生成
+          <!--noindex-->
+          <div class="post-button text-center">
+            <a class="btn" href="/2016/12/03/Flink基本组件和逻辑计划/">
+              阅读全文 &raquo;
+            </a>
+          </div>
+          <!--/noindex-->
+        
+      
     </div>
 
-    
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+
+    <footer class="post-footer">
       
 
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
+      
 
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/03/29/flink-kafka-connector/" itemprop="url">
-              
-                <span itemprop="name">flink kafka connector 设计与实现</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-03-29T18:40:48+08:00"
-              content="2017-03-29" >
-          03-29
-        </time>
-      </div>
-
-    </header>
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
   </article>
 
 
     
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/03/29/flink-AsyncIO-剖析/" itemprop="url">
-              
-                <span itemprop="name">flink-AsyncIO-剖析</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-03-29T18:29:27+08:00"
-              content="2017-03-29" >
-          03-29
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/09/flink对用户代码异常处理/" itemprop="url">
-              
-                <span itemprop="name">flink 对用户代码异常处理</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-09T13:51:54+08:00"
-              content="2017-02-09" >
-          02-09
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/09/flink-scheduler/" itemprop="url">
-              
-                <span itemprop="name">flink scheduler</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-09T13:48:52+08:00"
-              content="2017-02-09" >
-          02-09
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/09/flink-watermark-checkpoint/" itemprop="url">
-              
-                <span itemprop="name">flink watermark and checkpoint</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-09T13:44:06+08:00"
-              content="2017-02-09" >
-          02-09
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/09/flink网络栈/" itemprop="url">
-              
-                <span itemprop="name">flink 网络栈</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-09T13:38:48+08:00"
-              content="2017-02-09" >
-          02-09
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/09/taskmanager基本组件/" itemprop="url">
-              
-                <span itemprop="name">taskmanager 基本组件</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-09T12:41:53+08:00"
-              content="2017-02-09" >
-          02-09
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/08/flink算子的生命周期/" itemprop="url">
-              
-                <span itemprop="name">flink 算子的生命周期</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-08T22:35:36+08:00"
-              content="2017-02-08" >
-          02-08
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/08/jobmanager基本组件/" itemprop="url">
-              
-                <span itemprop="name">jobmanager 基本组件</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-08T22:22:33+08:00"
-              content="2017-02-08" >
-          02-08
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-      
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-    <header class="post-header">
-
-      <h1 class="post-title">
-        
-            <a class="post-title-link" href="/2017/02/06/flink物理计划生成/" itemprop="url">
-              
-                <span itemprop="name">flink 物理计划生成</span>
-              
-            </a>
-        
-      </h1>
-
-      <div class="post-meta">
-        <time class="post-time" itemprop="dateCreated"
-              datetime="2017-02-06T17:12:21+08:00"
-              content="2017-02-06" >
-          02-06
-        </time>
-      </div>
-
-    </header>
-  </article>
-
-
-    
-  </div>
+  </section>
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/tags/flink/page/2/">2</a><a class="extend next" rel="next" href="/tags/flink/page/2/"><i class="fa fa-angle-right"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span>
   </nav>
 
 
@@ -786,7 +666,7 @@
 
     <script type="text/javascript">
       var disqus_shortname = 'danny0405';
-      var disqus_identifier = 'tags/flink/index.html';
+      var disqus_identifier = 'page/2/index.html';
 
       var disqus_title = "";
 

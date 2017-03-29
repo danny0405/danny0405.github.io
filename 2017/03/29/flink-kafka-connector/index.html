@@ -70,7 +70,7 @@
 <link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
 
 
-  <meta name="keywords" content="flink,source_code," />
+  <meta name="keywords" content="flink,kafka," />
 
 
 
@@ -88,20 +88,19 @@
 
 
 
-<meta name="description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
+<meta name="description" content="本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义">
 <meta property="og:type" content="article">
-<meta property="og:title" content="taskmanager 基本组件">
-<meta property="og:url" content="https://danny0405.github.io/2017/02/09/taskmanager基本组件/index.html">
+<meta property="og:title" content="flink kafka connector 设计与实现">
+<meta property="og:url" content="https://danny0405.github.io/2017/03/29/flink-kafka-connector/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
-<meta property="og:image" content="https://danny0405.github.io/memory-segment-extend.png">
-<meta property="og:image" content="https://danny0405.github.io/file-channel-entend.png">
-<meta property="og:image" content="https://danny0405.github.io/io-manager-async.png">
-<meta property="og:updated_time" content="2017-02-13T13:34:57.000Z">
+<meta property="og:description" content="本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义">
+<meta property="og:image" content="https://danny0405.github.io/component-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/handover.png">
+<meta property="og:updated_time" content="2017-03-29T10:43:28.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="taskmanager 基本组件">
-<meta name="twitter:description" content="TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展">
-<meta name="twitter:image" content="https://danny0405.github.io/memory-segment-extend.png">
+<meta name="twitter:title" content="flink kafka connector 设计与实现">
+<meta name="twitter:description" content="本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义">
+<meta name="twitter:image" content="https://danny0405.github.io/component-extend.png">
 
 
 
@@ -129,13 +128,13 @@
 
 
 
-  <link rel="canonical" href="https://danny0405.github.io/2017/02/09/taskmanager基本组件/"/>
+  <link rel="canonical" href="https://danny0405.github.io/2017/03/29/flink-kafka-connector/"/>
 
 
 
 
 
-  <title> taskmanager 基本组件 | 玉兆的博客 </title>
+  <title> flink kafka connector 设计与实现 | 玉兆的博客 </title>
 </head>
 
 <body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
@@ -300,7 +299,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/09/taskmanager基本组件/">
+  <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/03/29/flink-kafka-connector/">
 
   <span style="display:none" itemprop="author" itemscope itemtype="http://schema.org/Person">
     <meta itemprop="name" content="chenyuzhao">
@@ -324,7 +323,7 @@
             
             
               
-                taskmanager 基本组件
+                flink kafka connector 设计与实现
               
             
           </h1>
@@ -339,8 +338,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-02-09T12:41:53+08:00">
-                2017-02-09
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2017-03-29T18:40:48+08:00">
+                2017-03-29
               </time>
             
 
@@ -380,8 +379,8 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/02/09/taskmanager基本组件/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/02/09/taskmanager基本组件/" itemprop="commentCount"></span>
+                <a href="/2017/03/29/flink-kafka-connector/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count" data-disqus-identifier="2017/03/29/flink-kafka-connector/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -391,7 +390,7 @@
 
           
           
-             <span id="/2017/02/09/taskmanager基本组件/" class="leancloud_visitors" data-flag-title="taskmanager 基本组件">
+             <span id="/2017/03/29/flink-kafka-connector/" class="leancloud_visitors" data-flag-title="flink kafka connector 设计与实现">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -407,7 +406,7 @@
 
           
               <div class="post-description">
-                  TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展
+                  本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义
               </div>
           
 
@@ -422,81 +421,81 @@
       
 
       
-        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展</p>
-<h2 id="MemoryManager"><a href="#MemoryManager" class="headerlink" title="MemoryManager"></a>MemoryManager</h2><p><em>先来翻译一下类的 JavaDoc ^_^</em></p>
-<p>MemoryManager 统一管理了 flink 的内存使用，内存被划分为相同大小的 segment，通过申请不同数量的 segment 来分配不同大小的内存</p>
-<p>这里支持两种内存：on-heap 内存和 off-heap 内存，通过参数可以控制分配内存的种类</p>
-<p>MemoryManager 管理内存也分两种模式：预分配和按需分配。预分配模式下，内存在启动时就会分好，这就会意味着不会发生 OOM 异常，释放的内存会重新归还 MemoryManager 的内存池；按需模式下，MemoryManager 仅仅追踪内存的使用【做记录】，释放内存不会归还 MemoryManager 的内存池，而是通过托管给 JVM 的垃圾回收来最终释放，这样便可能会发生 OOM</p>
-<p><em>下面我们就来分析下 MemoryManager 的实现细节</em></p>
-<h3 id="MemorySegment"><a href="#MemorySegment" class="headerlink" title="MemorySegment"></a>MemorySegment</h3><p>上面已经提到，MemoryManager 以 segment 为单位来实现内存的分配和管理，在 flink 中一个 segment 被抽象为 MemorySegment，MemorySegment 为抽象类，定义了基本的 put/get 方法，以及 swap、compare 等工具方法，同时维护了一个偏移量：BYTE_ARRAY_BASE_OFFSET，这个偏移量为 byte[] 对象在内存中的基本偏移量，后续通过 <code>sun.misc.Unsafe</code> 直接操纵内存就是基于这个偏移量来完成，这个类定义的实现方法屏蔽了内存的种类【堆和非堆】，当其成员变量 heapMemory 不为空时就是堆内存，此时的 address 就是 BYTE_ARRAY_BASE_OFFSET；而 heapMemory 为 null 时代表非堆内存，此时的 address 是内存中的绝对地址。</p>
-<p>MemorySegment 有两个实现类：HeapMemorySegment 和 HibridMemorySegment，分别代表堆内存 segment 和 非堆内存 segment，具体的继承关系如下：</p>
-<p><img src="memory-segment-extend.png" alt="memory-segment-extend.png"></p>
-<p>HeapMemorySegment 和 HibridMemorySegment 中都分别定义了工厂类来实例化对象实例。</p>
-<h3 id="MemoryPool"><a href="#MemoryPool" class="headerlink" title="MemoryPool"></a>MemoryPool</h3><p>MemoryPool 是 MemoryManager 用来统一管理资源的组件，具体又分为 HeapMemoryPool 和 HybridOffHeapMemoryPool，前者管理堆内存，后者管理非堆内存。</p>
-<p><em>先来看HeapMemoryPool</em></p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//MemoryManager.java line 616</span></div><div class="line"><span class="meta">@Override</span></div><div class="line">		<span class="function">HeapMemorySegment <span class="title">allocateNewSegment</span><span class="params">(Object owner)</span> </span>&#123;</div><div class="line">			<span class="keyword">return</span> HeapMemorySegment.FACTORY.allocateUnpooledSegment(segmentSize, owner);</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="meta">@Override</span></div><div class="line">		<span class="function">HeapMemorySegment <span class="title">requestSegmentFromPool</span><span class="params">(Object owner)</span> </span>&#123;</div><div class="line">			<span class="keyword">byte</span>[] buf = availableMemory.remove();</div><div class="line">			<span class="keyword">return</span>  HeapMemorySegment.FACTORY.wrapPooledHeapMemory(buf, owner);</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="meta">@Override</span></div><div class="line">		<span class="function"><span class="keyword">void</span> <span class="title">returnSegmentToPool</span><span class="params">(MemorySegment segment)</span> </span>&#123;</div><div class="line">			<span class="keyword">if</span> (segment.getClass() == HeapMemorySegment.class) &#123;</div><div class="line">				HeapMemorySegment heapSegment = (HeapMemorySegment) segment;</div><div class="line">				availableMemory.add(heapSegment.getArray());</div><div class="line">				heapSegment.free();</div><div class="line">			&#125;</div><div class="line">			<span class="keyword">else</span> &#123;</div><div class="line">				<span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"Memory segment is not a "</span> + HeapMemorySegment.class.getSimpleName());</div><div class="line">			&#125;</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
-<p>简单总结：</p>
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>Kafka 作为成熟的消息队列目前在大数据场景中应用的越来越广泛，其高性能与多 producer push 多 consumer pull 的消息流非常适合流式计算场景；同时 kafka 是较好的支持回溯消费的队列之一，为各种流式计算框架设计 at-least-once 甚至 exact-once 语义的计算模型提供了可能</p>
+<p>本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义</p>
+<h2 id="核心组件介绍"><a href="#核心组件介绍" class="headerlink" title="核心组件介绍"></a>核心组件介绍</h2><p>先来看下 flink-kafka-connector 都有哪些核心组件以支撑数据访问</p>
+<p>先来看下整体的组件继承关系：</p>
+<p><img src="component-extend.png" alt="component-extend.png"></p>
+<p>从上图可以直观的看出，FlinkKafkaConsumerBase 是核心类，它继承自 SourceFunction 接口，通过运行 <code>run()</code> 方法获取数据，背后又是通过维护一个 AbstractFetcher 成员获取数据，AbstractFetcher 又维护了一个消费线程 KafkaConsumerThread 来不断与 Kafka 交互；同时我们观察到 AbstractFetcher 为每个消费的 kafka partition 维护了一个状态成员 KafkaTopicPartitionState，来保存 partition 当前消费到的 offset 以及已经 commit 到 kafka 的 offset 信息</p>
+<h2 id="消息及-WaterMark-分发策略"><a href="#消息及-WaterMark-分发策略" class="headerlink" title="消息及 WaterMark 分发策略"></a>消息及 WaterMark 分发策略</h2><p>上面我们说到每个 AbstractFetcher 封装了具体的获取数据的逻辑，与此同时，它也提供了三种模式来控制自己生产时间戳 timestamp 和 watermark 的模式：</p>
 <ul>
-<li>allocateNewSegment 走的是 on demand 模式，通过 new byte[] 从堆上分配内存</li>
-<li>requestSegmentFromPool 走的是 pre allocate 模式，通过复用已有的堆对象</li>
+<li>NO_TIMESTAMPS_WATERMARKS: fetcher 不生产 timestamp 和 watermarks</li>
+<li>PERIODIC_WATERMARKS: fetcher 阶段性定时生产 watermarks</li>
+<li>PUNCTUATED_WATERMARKS: fetcher 生产标记 watermark 【按照特定的消息字段值触发】</li>
 </ul>
-<p>HybridOffHeapMemoryPool 的接口与其类似，不过分配内存走的是 <code>ByteBuffer.allocateDirect(segmentSize);</code> 直接分配了物理内存，也就是非堆内存</p>
-<h2 id="IOManager"><a href="#IOManager" class="headerlink" title="IOManager"></a>IOManager</h2><p>flink 通过 IOManager 来控制磁盘 IO 的过程，提供同步和异步两种写模式【其实只有异步】，具体的读写方式又分为 block、buffer、bulk 三种方式；用户可以指定 IO 的文件目录集合，IOManager 会以 round-robin 的方式写不同目录的不同文件。</p>
-<p>IOManager 提供两种方式枚举新的 IO 文件：</p>
+<p>而 <em>对应</em> 这三种不同的模式，AbstractFetcher 会维护三种不同的 KafkaTopicPartitionState：</p>
 <ul>
-<li><p>直接 round-robin 文件夹并生成文件，每个新文件的命名 pattern 为 random_hex_string.channel，最终对应的目录结构是：</p>
-<p>path1/random_hex_string1.channel</p>
-<p>path2/random_hex_string2.channel</p>
-<p>path3/random_hex_string3.channel</p>
-</li>
-<li><p>采取 Enumerator 的模式，每个 Enumerator 也是类似如上一种方式进行 round-robin，不过 Enumerator 会维护一个固定的本地命名前缀、一个本地计数器、一个全局计数器，命名前缀用于区分不同的 Enumerator 写的文件，本地计数器用于 Enumerator 自身的文件命名递增，全局计数器用于 round-robin 文件夹，最终的目录结构是：</p>
-<p>path1/prefix.local_counter1.channel</p>
-<p>path2/prefix.local_counter2.channel</p>
-<p>path3/prefix.local_counter3.channel</p>
-</li>
+<li>KafkaTopicPartitionState: 只维护 partiton 相关信息</li>
+<li>KafkaTopicPartitionStateWithPeriodicWatermarks: 维护了一个 AssignerWithPeriodicWatermarks 引用</li>
+<li>KafkaTopicPartitionStateWithPunctuatedWatermarks: 维护了一个 AssignerWithPunctuatedWatermarks 引用</li>
 </ul>
-<p>flink 又进一步将一个文件的 IO 抽象成了 FileIOChannel，通过 FileIOChannel 封装了底层的文件读写，具体的继承关系如下：</p>
-<p><img src="file-channel-entend.png" alt="file-channel-entend.png"></p>
-<p>IOManager 的唯一实现类：IOManagerAsync 为每个人临时文件加【用户初始化的时候指定】维护了一个读线程和写线程，并且每个读写线程内部会维护一个请求队列: RequestQueue，上面的 FileIOChannel 通过将 读写请求加入到对应的 RequestQueue 中来实现文件读写，具体的线程模型如下：</p>
-<p><img src="io-manager-async.png" alt="io-manager-async.png"></p>
-<p>ps: 默认的临时文件夹目录是 java.io.tmpDir</p>
-<h2 id="NetworkEnvironment"><a href="#NetworkEnvironment" class="headerlink" title="NetworkEnvironment"></a>NetworkEnvironment</h2><p>NetworkEnvironment 是每个 Instance 的网络 IO 组件，包含了追踪中间结果和数据交换的数据结构。它的构造器会统一将配置的内存先分配出来，抽象成 NetworkBufferPool 统一管理内存的申请和释放。</p>
-<h3 id="BufferPool"><a href="#BufferPool" class="headerlink" title="BufferPool"></a>BufferPool</h3><p>从 MemoryManager 的介绍中我们讲到 flink 是以 MemorySegment 为单位来管理内存的，而一个 MemorySegment 又被叫做一个 Buffer。BufferPool 是管理 Buffer 的工具。Buffer 的申请统一交给 NetworkBufferPool，具体的管理交给 LocalBufferPool。</p>
-<h4 id="LocalBufferPool"><a href="#LocalBufferPool" class="headerlink" title="LocalBufferPool"></a>LocalBufferPool</h4><p>我们来看 LocalBufferPool 的关键接口，以了解具体都有哪些方式来管理 Buffer 😄。</p>
-<h5 id="申请-Buffer"><a href="#申请-Buffer" class="headerlink" title="申请 Buffer"></a>申请 Buffer</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//LocalBufferPool line136</span></div><div class="line"><span class="function"><span class="keyword">private</span> Buffer <span class="title">requestBuffer</span><span class="params">(<span class="keyword">boolean</span> isBlocking)</span> <span class="keyword">throws</span> InterruptedException, IOException </span>&#123;</div><div class="line">		<span class="keyword">synchronized</span> (availableMemorySegments) &#123;</div><div class="line">			returnExcessMemorySegments();</div><div class="line"></div><div class="line">			<span class="keyword">boolean</span> askToRecycle = owner != <span class="keyword">null</span>;</div><div class="line"><span class="comment">//...</span></div></pre></td></tr></table></figure>
-<p>总结其逻辑：</p>
+<p>如前面的继承关系所示，KafkaTopicPartitionState 只维护基本的一些 partition 的信息，而后两者分别维护了获取 partition 的 timestamp 和 watermark 的策略，也就是：AssignerWithPeriodicWatermarks 和 AssignerWithPunctuatedWatermarks</p>
+<p>AbstractFetcher 通过 <code>run()</code> 方法来获取数据，<code>run()</code> 方法又会调用其 <code>runFetchLoop()</code> 方法来不断拉取数据。Kafka09Fetcher 作为 AbstractFetcher 的实现类之一，其重载的方法 <code>runFetchLoop()</code> 会先启动消费线程 KafkaConsumerThread，后不断 while 循环从 HandOver poll 数据，【这一块的消费模型我们后面介绍】，接着将这些数据发送给下游算子，发射的逻辑封装在 AbstractFetcher 的方法 <code>emitRecord()</code>:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">emitRecord</span><span class="params">(T record, KafkaTopicPartitionState&lt;KPH&gt; partitionState, <span class="keyword">long</span> offset)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   <span class="keyword">if</span> (timestampWatermarkMode == NO_TIMESTAMPS_WATERMARKS) &#123;</div><div class="line">      <span class="comment">// fast path logic, in case there are no watermarks</span></div><div class="line"></div><div class="line">      <span class="comment">// emit the record, using the checkpoint lock to guarantee</span></div><div class="line">      <span class="comment">// atomicity of record emission and offset state update</span></div><div class="line">      <span class="keyword">synchronized</span> (checkpointLock) &#123;</div><div class="line">         sourceContext.collect(record);</div><div class="line">         partitionState.setOffset(offset);</div><div class="line">      &#125;</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">else</span> <span class="keyword">if</span> (timestampWatermarkMode == PERIODIC_WATERMARKS) &#123;</div><div class="line">      emitRecordWithTimestampAndPeriodicWatermark(record, partitionState, offset, Long.MIN_VALUE);</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">else</span> &#123;</div><div class="line">      emitRecordWithTimestampAndPunctuatedWatermark(record, partitionState, offset, Long.MIN_VALUE);</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>我们可以看到，依据生产时间戳 timestamp 和 watermark 的模式的不同，会走不同的发射逻辑，我们只分析 PERIODIC_WATERMARKS 和 PUNCTUATED_WATERMARKS 两种策略</p>
+<h3 id="消息分发策略"><a href="#消息分发策略" class="headerlink" title="消息分发策略"></a>消息分发策略</h3><p>不管是 PERIODIC_WATERMARKS 还是 PUNCTUATED_WATERMARKS 策略，均会做这两件事情：</p>
 <ul>
-<li>申请 Buffer</li>
-<li>释放超量申请的 Buffer</li>
-<li>像 NetworkBufferPool 申请 Buffer</li>
-<li>如果此 LocalBufferPool 有 owner【ResultPartition】，像 ResultPartition 释放内存，这里又会下发到 ResultPartition 的 subPartition，释放是以 subPartition 的全部内存为单位，会将内存中的数据吐到磁盘上或者不释放【依据配置的不同】</li>
+<li>通过调用 <code>sourceContext.collectWithTimestamp()</code> 来收集消息和时间戳</li>
+<li>将消息对应的 offset 信息保存到对应的 KafkaPartitionState【有不同实现类型】</li>
 </ul>
-<h5 id="回收-Buffer"><a href="#回收-Buffer" class="headerlink" title="回收 Buffer"></a>回收 Buffer</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//LocalBufferPool line175</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">recycle</span><span class="params">(MemorySegment segment)</span> </span>&#123;</div><div class="line">		<span class="keyword">synchronized</span> (availableMemorySegments) &#123;</div><div class="line">			<span class="keyword">if</span> (isDestroyed || numberOfRequestedMemorySegments &gt; currentPoolSize) &#123;</div><div class="line">				returnMemorySegment(segment);</div><div class="line">			&#125;</div></pre></td></tr></table></figure>
-<p>简单的总结：</p>
+<p>那么问题的关键就是 sourceContext，SourceContext Interface 被定义在 SourceFunction 中作为嵌套 Interface，它统一管理源算子的消息和 watermark 的发送</p>
+<p>那么 SourceContext 都有哪些具体的类型呢？通过什么方式来控制？</p>
+<p>在 StreamSource 的 <code>run()</code> 方法中，我们看到有这样的逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">this</span>.ctx = StreamSourceContexts.getSourceContext(</div><div class="line">   timeCharacteristic, getProcessingTimeService(), lockingObject, collector, watermarkInterval);</div></pre></td></tr></table></figure>
+<p>可以看到 StreamSource 的类型主要通过 timeCharacteristic 来控制:</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="keyword">static</span> &lt;OUT&gt; SourceFunction.<span class="function">SourceContext&lt;OUT&gt; <span class="title">getSourceContext</span><span class="params">(</span></span></div><div class="line">      TimeCharacteristic timeCharacteristic, ProcessingTimeService processingTimeService,</div><div class="line">      Object checkpointLock, Output&lt;StreamRecord&lt;OUT&gt;&gt; output, <span class="keyword">long</span> watermarkInterval) &#123;</div><div class="line"></div><div class="line">   <span class="keyword">final</span> SourceFunction.SourceContext&lt;OUT&gt; ctx;</div><div class="line">   <span class="keyword">switch</span> (timeCharacteristic) &#123;</div><div class="line">      <span class="keyword">case</span> EventTime:</div><div class="line">         ctx = <span class="keyword">new</span> ManualWatermarkContext&lt;&gt;(checkpointLock, output);</div><div class="line">         <span class="keyword">break</span>;</div><div class="line">      <span class="keyword">case</span> IngestionTime:</div><div class="line">         ctx = <span class="keyword">new</span> AutomaticWatermarkContext&lt;&gt;(processingTimeService, checkpointLock, output, watermarkInterval);</div><div class="line">         <span class="keyword">break</span>;</div><div class="line">      <span class="keyword">case</span> ProcessingTime:</div><div class="line">         ctx = <span class="keyword">new</span> NonTimestampContext&lt;&gt;(checkpointLock, output);</div><div class="line">         <span class="keyword">break</span>;</div><div class="line">      <span class="keyword">default</span>:</div><div class="line">         <span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(String.valueOf(timeCharacteristic));</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">return</span> ctx;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>我们这里列一下不同的 时间特性 下的 collect 策略：</p>
 <ul>
-<li>如果此 LocalBuffer 已销毁或超量使用，将 Buffer 归还给 NetworkBufferPool</li>
-<li>否则如果注册了 EventListener ，通知每个 listener 这个 Buffer 被回收</li>
-<li>如果没有注册，将这个 Buffer 重新标记为可使用【加入到待申请队列】</li>
+<li>EventTime: 直接按照传入的 element 和 timestamp 封装成 StreamRecord emit 出去</li>
+<li>IngestionTime: 将传进来的 timestamp 丢弃，并采用当前的系统时间赋给 StreamRecord emit 出去，同时会 check 当前的系统时间是否达到下次 watermark 的触发时间，如果达到会 emit 一个 watermark 到下游，同时 AutomaticWatermarkContext 会注册一个 timertask，按照 watermark 的间隔时间定时 check 系统时间，如果达到触发 watermark 的条件也会发射一个 watermark 到下游，设置两个触发逻辑的目的是尽量保证 watermark 在符合条件时 <em>及时</em> 触发发送到下游</li>
+<li>ProcessingTime: 直接将传入的 element 封装成 StreamRecord 发射到下游，忽略传入的时间戳</li>
 </ul>
-<h5 id="调整-Buffer-大小"><a href="#调整-Buffer-大小" class="headerlink" title="调整 Buffer 大小"></a>调整 Buffer 大小</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//LocalBufferPool line237</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">setNumBuffers</span><span class="params">(<span class="keyword">int</span> numBuffers)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="keyword">synchronized</span> (availableMemorySegments) &#123;</div><div class="line">			checkArgument(numBuffers &gt;= numberOfRequiredMemorySegments, <span class="string">"Buffer pool needs at least "</span> + numberOfRequiredMemorySegments + <span class="string">" buffers, but tried to set to "</span> + numBuffers + <span class="string">"."</span>);</div><div class="line"></div><div class="line">			currentPoolSize = numBuffers;</div></pre></td></tr></table></figure>
-<p>简单总结：</p>
+<h3 id="WaterMark-策略"><a href="#WaterMark-策略" class="headerlink" title="WaterMark 策略"></a>WaterMark 策略</h3><p>其实上面再介绍 IngestionTime 的时候已经介绍了一部分的 watermark 的触发策略，毕竟 StreamSource 是控制消息和 watermark 发射的总入口，影响 watermark 发射的最终逻辑一共有两个：</p>
 <ul>
-<li>归还超量使用的内存给 NetworkBufferPool</li>
-<li>如果还是超量使用，调用 owner 的释放接口【以 ResultSubPartiton 为单位释放】</li>
+<li>时间特性：IngestionTime 时间处理特性下 StreamSource 会定时触发 watermark 的发射</li>
+<li>用户指定的 watermark 特性：前面介绍的三种</li>
 </ul>
-<h4 id="NetworkBufferPool"><a href="#NetworkBufferPool" class="headerlink" title="NetworkBufferPool"></a>NetworkBufferPool</h4><p>上面已经提到，NetworkbufferPool 统一管理了网络栈的内存，LocalBufferPool 只是管理 Buffer 的方式，具体的申请和释放还是要走 NetworkBufferPool 的接口。值得注意的是，NetworkBufferPool 在实例化的时候就将初始的固定大小的内存分配出来了【不管是堆还是非堆】。我们来看它的关键接口：</p>
-<h5 id="创建-LocalBufferPool"><a href="#创建-LocalBufferPool" class="headerlink" title="创建 LocalBufferPool"></a>创建 LocalBufferPool</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//NetworkBufferPool line184</span></div><div class="line"><span class="meta">@Override</span></div><div class="line">	<span class="function"><span class="keyword">public</span> BufferPool <span class="title">createBufferPool</span><span class="params">(<span class="keyword">int</span> numRequiredBuffers, <span class="keyword">boolean</span> isFixedSize)</span> <span class="keyword">throws</span> IOException </span>&#123;</div><div class="line">		<span class="comment">// It is necessary to use a separate lock from the one used for buffer</span></div><div class="line">		<span class="comment">// requests to ensure deadlock freedom for failure cases.</span></div><div class="line">		<span class="keyword">synchronized</span> (factoryLock) &#123;</div><div class="line">			<span class="keyword">if</span> (isDestroyed) &#123;</div><div class="line">				<span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">"Network buffer pool has already been destroyed."</span>);</div><div class="line">			&#125;</div></pre></td></tr></table></figure>
-<p>简单总结：</p>
+<p>现在我们再回到 AbstractFetcher，来看下用户指定不同的 watermark 特性对 watermark 发射的影响</p>
+<h4 id="PERIODIC-WATERMARKS"><a href="#PERIODIC-WATERMARKS" class="headerlink" title="PERIODIC_WATERMARKS"></a>PERIODIC_WATERMARKS</h4><p>如果用户指定这样的 watermark 特性，AbstractFetcher 会另起一个 timertask，按照 watermark interval 去定时调用 SourceContext 的 <code>emitWatermark()</code> 接口，我们看 SourceContext 的实现可以知道，只有 EventTime 对应的 ManualWatermarkContext 才会将 watermark emit 出去，其它会自动忽略掉</p>
+<p>也就是说 PERIODIC_WATERMARKS 策略搭配 EventTime 的时间处理特性才有意义</p>
+<p>这里获取的 watermark 是当前所有消费 partition 的 KafkaPartitionState 获取到的 watermark 时间的最小值，是和消息本身相关联的</p>
+<p>ps: 个人觉得 AutomaticWatermarkContext 的 watermark 策略应该统一移到 PERIODIC_WATERMARKS。这样模块划分更清晰，用户也更容易理解，不过 flink 这么安排也是有它的合理性：PROCESSING_TIME 时间处理特性下，用户只关心源算子当前的处理时间，和消息本身无关，所有由 AutomaticWatermarkContext 统一控制</p>
+<h4 id="PUNCTUATED-WATERMARKS"><a href="#PUNCTUATED-WATERMARKS" class="headerlink" title="PUNCTUATED_WATERMARKS"></a>PUNCTUATED_WATERMARKS</h4><p>如果指定 PUNCTUATED_WATERMARKS 作为 watermark 特性，也就是用户依据消息中的触发字段来触发 watermark，这时候发射逻辑如下：</p>
 <ul>
-<li>做一些状态备份，包括整体使用的 Buffer 数、可动态调整大小的 BufferPool 等</li>
-<li>对于可动态调整的 BufferPool，重新调整可用内存，调整方式为 round-robin</li>
+<li>用户每读取一条消息，就判断是否可以出发 watermark</li>
+<li>如果可触发，获取每个 partition 的 watermark 并取时间戳最小的 watermark</li>
+<li>如果这个最小时间戳大于上次发射的 watermark 的时间戳，则通过 SourceContext 发射出去</li>
 </ul>
-<h5 id="销毁-LocalBufferPool"><a href="#销毁-LocalBufferPool" class="headerlink" title="销毁 LocalBufferPool"></a>销毁 LocalBufferPool</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//NetworkBufferPool line227</span></div><div class="line"><span class="meta">@Override</span></div><div class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">destroyBufferPool</span><span class="params">(BufferPool bufferPool)</span> </span>&#123;</div><div class="line">		<span class="keyword">if</span> (!(bufferPool <span class="keyword">instanceof</span> LocalBufferPool)) &#123;</div><div class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> IllegalArgumentException(<span class="string">"bufferPool is no LocalBufferPool"</span>);</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
-<p>简单总结：</p>
+<p>由上面分析可以知道，PUNCTUATED_WATERMARKS 也是只对 EVENT_TIME 时间特性有意义</p>
+<h2 id="Checkpoint-及恢复"><a href="#Checkpoint-及恢复" class="headerlink" title="Checkpoint 及恢复"></a>Checkpoint 及恢复</h2><h3 id="快照策略"><a href="#快照策略" class="headerlink" title="快照策略"></a>快照策略</h3><p>策略集中在 FlinkKafkaConsumerBase 的 <code>snapshotState()</code>  方法中，</p>
+<h4 id="发起快照策略"><a href="#发起快照策略" class="headerlink" title="发起快照策略"></a>发起快照策略</h4><ul>
+<li>清空之前的快照状态</li>
+<li>从维护的 KafkaTopicPartitionState 获取每个 partition 当前 <em>处理到的</em> offset</li>
+<li>记录下来用户后面 commit 到 kafka 用</li>
+<li>将 offset 信息快照到状态存储</li>
+</ul>
+<h4 id="一轮快照结束后的-commit-策略"><a href="#一轮快照结束后的-commit-策略" class="headerlink" title="一轮快照结束后的 commit 策略"></a>一轮快照结束后的 commit 策略</h4><p>将之前快照的 offset 通过 AbstractFetcher commit 到 kafka</p>
+<p>ps: AbstractUdfStreamOperator 管理了快照背后的逻辑 [ 存储及序列化 ]</p>
+<h3 id="恢复策略"><a href="#恢复策略" class="headerlink" title="恢复策略"></a>恢复策略</h3><p>从状态存储中恢复之前快照的 offset 信息并 set 到对应的 KafkaTopicPartitionState 中</p>
+<h2 id="HandOver"><a href="#HandOver" class="headerlink" title="HandOver"></a>HandOver</h2><p>前面提到消息的消费是由 fetcher 中的 HandOver 和 KafkaConsumerThread 共同完成的，有的同学可能有疑问，KafkaConsumerThread 直接消费就好，为什么要有一个 HandOver 呢？</p>
+<p>HandOver 的存在有两个目的：</p>
 <ul>
-<li>消除状态记录</li>
-<li>对于可动态调整的 BufferPool，重新调整可用内存，调整方式为 round-robin</li>
+<li>控制消费队列的大小</li>
+<li>不会阻塞 offset commit 到 kafka 的逻辑</li>
 </ul>
+<p>HandOver 实际是一个锁控制器，当它收到 commit offset 请求时会优先处理 commit 的逻辑，同时如果 HandOver 中如果有未消费的一批消息，会阻塞消费线程的消费</p>
+<p>附一张图：</p>
+<p><img src="handover.png" alt="handover.png"></p>
 
       
     </div>
@@ -538,7 +537,7 @@
           
             <a href="/tags/flink/" rel="tag"># flink</a>
           
-            <a href="/tags/source-code/" rel="tag"># source_code</a>
+            <a href="/tags/kafka/" rel="tag"># kafka</a>
           
         </div>
       
@@ -547,8 +546,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/02/08/flink算子的生命周期/" rel="next" title="flink 算子的生命周期">
-                <i class="fa fa-chevron-left"></i> flink 算子的生命周期
+              <a href="/2017/03/29/flink-AsyncIO-剖析/" rel="next" title="flink-AsyncIO-剖析">
+                <i class="fa fa-chevron-left"></i> flink-AsyncIO-剖析
               </a>
             
           </div>
@@ -556,10 +555,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2017/02/09/flink网络栈/" rel="prev" title="flink 网络栈">
-                flink 网络栈 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -696,7 +691,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#MemoryManager"><span class="nav-number">2.</span> <span class="nav-text">MemoryManager</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#MemorySegment"><span class="nav-number">2.1.</span> <span class="nav-text">MemorySegment</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MemoryPool"><span class="nav-number">2.2.</span> <span class="nav-text">MemoryPool</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IOManager"><span class="nav-number">3.</span> <span class="nav-text">IOManager</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#NetworkEnvironment"><span class="nav-number">4.</span> <span class="nav-text">NetworkEnvironment</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#BufferPool"><span class="nav-number">4.1.</span> <span class="nav-text">BufferPool</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#LocalBufferPool"><span class="nav-number">4.1.1.</span> <span class="nav-text">LocalBufferPool</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#申请-Buffer"><span class="nav-number">4.1.1.1.</span> <span class="nav-text">申请 Buffer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#回收-Buffer"><span class="nav-number">4.1.1.2.</span> <span class="nav-text">回收 Buffer</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#调整-Buffer-大小"><span class="nav-number">4.1.1.3.</span> <span class="nav-text">调整 Buffer 大小</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#NetworkBufferPool"><span class="nav-number">4.1.2.</span> <span class="nav-text">NetworkBufferPool</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#创建-LocalBufferPool"><span class="nav-number">4.1.2.1.</span> <span class="nav-text">创建 LocalBufferPool</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#销毁-LocalBufferPool"><span class="nav-number">4.1.2.2.</span> <span class="nav-text">销毁 LocalBufferPool</span></a></li></ol></li></ol></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#核心组件介绍"><span class="nav-number">2.</span> <span class="nav-text">核心组件介绍</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#消息及-WaterMark-分发策略"><span class="nav-number">3.</span> <span class="nav-text">消息及 WaterMark 分发策略</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#消息分发策略"><span class="nav-number">3.1.</span> <span class="nav-text">消息分发策略</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WaterMark-策略"><span class="nav-number">3.2.</span> <span class="nav-text">WaterMark 策略</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#PERIODIC-WATERMARKS"><span class="nav-number">3.2.1.</span> <span class="nav-text">PERIODIC_WATERMARKS</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#PUNCTUATED-WATERMARKS"><span class="nav-number">3.2.2.</span> <span class="nav-text">PUNCTUATED_WATERMARKS</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Checkpoint-及恢复"><span class="nav-number">4.</span> <span class="nav-text">Checkpoint 及恢复</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#快照策略"><span class="nav-number">4.1.</span> <span class="nav-text">快照策略</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#发起快照策略"><span class="nav-number">4.1.1.</span> <span class="nav-text">发起快照策略</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#一轮快照结束后的-commit-策略"><span class="nav-number">4.1.2.</span> <span class="nav-text">一轮快照结束后的 commit 策略</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#恢复策略"><span class="nav-number">4.2.</span> <span class="nav-text">恢复策略</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#HandOver"><span class="nav-number">5.</span> <span class="nav-text">HandOver</span></a></li></ol></div>
             
 
           </div>
@@ -821,9 +816,9 @@
 
     <script type="text/javascript">
       var disqus_shortname = 'danny0405';
-      var disqus_identifier = '2017/02/09/taskmanager基本组件/';
+      var disqus_identifier = '2017/03/29/flink-kafka-connector/';
 
-      var disqus_title = "taskmanager 基本组件";
+      var disqus_title = "flink kafka connector 设计与实现";
 
 
       function run_disqus_script(disqus_script) {
