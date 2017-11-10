@@ -2,9 +2,16 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/</loc>
+    
+    <lastmod>2017-11-10T04:58:27.000Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://danny0405.github.io/2017/03/29/flink-kafka-connector/</loc>
     
-    <lastmod>2017-03-29T10:43:28.000Z</lastmod>
+    <lastmod>2017-06-20T14:28:20.000Z</lastmod>
     
   </url>
   

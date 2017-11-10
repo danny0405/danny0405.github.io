@@ -73,7 +73,7 @@
 <link href="/css/main.css?v=5.1.0" rel="stylesheet" type="text/css" />
 
 
-  <meta name="keywords" content="flink," />
+  <meta name="keywords" content="flink,window," />
 
 
 
@@ -91,16 +91,23 @@
 
 
 
-<meta name="description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
+<meta name="description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="flink 对用户代码异常处理">
-<meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/index.html">
+<meta property="og:title" content="Flink WindowOperator 的设计">
+<meta property="og:url" content="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
-<meta property="og:updated_time" content="2017-02-13T13:32:37.000Z">
+<meta property="og:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
+<meta property="og:image" content="https://danny0405.github.io/windowfunc-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/window-assigner-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/trigger-extend.png">
+<meta property="og:image" content="https://danny0405.github.io/window-op-comp.png">
+<meta property="og:image" content="https://danny0405.github.io/timer-event-relation.png">
+<meta property="og:image" content="https://danny0405.github.io/merging-window-set.png">
+<meta property="og:updated_time" content="2017-11-10T04:58:27.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="flink 对用户代码异常处理">
-<meta name="twitter:description" content="flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？">
+<meta name="twitter:title" content="Flink WindowOperator 的设计">
+<meta name="twitter:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
+<meta name="twitter:image" content="https://danny0405.github.io/windowfunc-extend.png">
 
 
 
@@ -128,13 +135,13 @@
 
 
 
-  <link rel="canonical" href="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/"/>
+  <link rel="canonical" href="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/"/>
 
 
 
 
 
-  <title> flink 对用户代码异常处理 | 玉兆的博客 </title>
+  <title> Flink WindowOperator 的设计 | 玉兆的博客 </title>
 </head>
 
 <body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
@@ -316,7 +323,7 @@
   
 
   <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
-    <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/">
+    <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="chenyuzhao">
@@ -337,7 +344,7 @@
             
             
               
-                flink 对用户代码异常处理
+                Flink WindowOperator 的设计
               
             
           </h1>
@@ -352,8 +359,8 @@
               
                 <span class="post-meta-item-text">发表于</span>
               
-              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-02-09T13:51:54+08:00">
-                2017-02-09
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-10-18T22:02:24+08:00">
+                2017-10-18
               </time>
             
 
@@ -393,9 +400,9 @@
                 <span class="post-meta-item-icon">
                   <i class="fa fa-comment-o"></i>
                 </span>
-                <a href="/2017/02/09/flink对用户代码异常处理/#comments" itemprop="discussionUrl">
+                <a href="/2017/10/18/Flink-WIndowOperator-的设计/#comments" itemprop="discussionUrl">
                   <span class="post-comments-count disqus-comment-count"
-                        data-disqus-identifier="2017/02/09/flink对用户代码异常处理/" itemprop="commentCount"></span>
+                        data-disqus-identifier="2017/10/18/Flink-WIndowOperator-的设计/" itemprop="commentCount"></span>
                 </a>
               </span>
             
@@ -403,7 +410,7 @@
 
           
           
-             <span id="/2017/02/09/flink对用户代码异常处理/" class="leancloud_visitors" data-flag-title="flink 对用户代码异常处理">
+             <span id="/2017/10/18/Flink-WIndowOperator-的设计/" class="leancloud_visitors" data-flag-title="Flink WindowOperator 的设计">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -421,7 +428,7 @@
 
           
               <div class="post-description">
-                  flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？
+                  本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。
               </div>
           
 
@@ -436,36 +443,91 @@
       
 
       
-        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？</p>
-<h2 id="异常后的组件通信"><a href="#异常后的组件通信" class="headerlink" title="异常后的组件通信"></a>异常后的组件通信</h2><p>一个 flink task 的线程 Runnable 类是 Task.java，我们观察到它的 <code>run()</code> 方法整个被一个大的 try catch 包住，这里重点关注 catch 用户异常之后的部分：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//Task line612</span></div><div class="line">		<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line"></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line">			<span class="comment">// the execution failed. either the invokable code properly failed, or</span></div><div class="line">			<span class="comment">// an exception was thrown as a side effect of cancelling</span></div><div class="line">			<span class="comment">// ----------------------------------------------------------------</span></div><div class="line"></div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				<span class="comment">// transition into our final state. we should be either in DEPLOYING, RUNNING, CANCELING, or FAILED</span></div><div class="line">				<span class="comment">// loop for multiple retries during concurrent state changes via calls to cancel() or</span></div><div class="line">				<span class="comment">// to failExternally()</span></div><div class="line">				<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">					ExecutionState current = <span class="keyword">this</span>.executionState;</div></pre></td></tr></table></figure>
-<p>简单总结其逻辑：</p>
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>窗口计算是流式计算里比较常见的场景，不同的计算框架在解决窗口计算方面提出了自己的思路，storm 目前还停留在内存计算的基础上，并且尚不支持事件时间滑动；spark-streaming 通过 struct-dtreaming 实现了事件/处理 时间的精确窗口计算，借助 rdd 的特性很好的保证了窗口计算的精确性；flink 在 data-flow 模型的设计前提下，友好的支持了事件/处理时间的窗口触发，同时借助分布式的状态存储，为窗口中间结果保存提供了较好的扩展性支持</p>
+<h2 id="核心抽象"><a href="#核心抽象" class="headerlink" title="核心抽象"></a>核心抽象</h2><p>这部分会介绍围绕 WindowOperator 的核心抽象，主要涉及窗口计算中的一些核心角色</p>
+<h3 id="Window"><a href="#Window" class="headerlink" title="Window"></a>Window</h3><p>Window 代表一个有限的元素集合，并且由多个 窗格/pane 组成，一个窗口有一个 maximux timestamp，代表某个时刻所有的窗口元素都已到达。窗口的实现有两个：</p>
 <ul>
-<li><p>如果当前的执行状态是 <code>ExecutionState.RUNNING</code> 或者 <code>ExecutionState.DEPLOYING</code>，表明是从正常运行到异常状态的过度，这时候判断是否是主动 Cancel 执行，如果是主动 Cancel，执行 StreamTask 的 <code>cancel()</code> 方法， 并通知观察者它的状态已变成：<code>ExecutionState.CANCELED</code>；如果不是主动 Cancel，表明是用户异常触发，这时候同样执行 StreamTask 的 <code>cancel()</code> 方法，然后通知观察者它的状态变成：<code>ExecutionState.FAILED</code>，这里的 cancel 方法留给 flink 内部的算子来实现，对于普通 task ，会停止消费上游数据，对于 source task，会停止发送源数据</p>
-</li>
-<li><p>对于用户异常来说，通知观察者的状态应该为 <code>ExecutionState.FAILED</code>，<em>我们下面详细分析</em></p>
-</li>
-<li><p>finally 的部分会释放掉这个 task 占有的所有资源，包括线程池、输入 InputGate 及 写出 ResultPartition 占用的全部 BufferPool、缓存的 jar 包等，最后通知 TaskManager 这个 Job 的 这个 task 已经执行结束：</p>
-<p><code>notifyFinalState()</code></p>
-</li>
+<li>TimeWindow: 具有时间窗口属性的窗口，会维护一个起始和终止时间</li>
+<li>GlobalWindow: 没有起始/终止时间的限制，所有的元素都会进一个窗口</li>
 </ul>
+<h3 id="WindowFunction"><a href="#WindowFunction" class="headerlink" title="WindowFunction"></a>WindowFunction</h3><p>在 Trigger 触发的时候，调用的函数，WindowFunction 接口有抽象实现 <code>RichWindowFunction</code>，用来提供对运行时环境 RuntimeContext 的访问及 <code>open()</code> <code>close()</code>  这样的声明周期管理方法。</p>
+<p>按照是否按照grouping key 来处理窗口元素，WindowFunction 可以被分为两类：</p>
 <ul>
-<li>如果异常逻辑发生了任何其它异常，说明是 TaskManager 相关环境发生问题，这个时候会杀死 TaskManager</li>
+<li>ProcessAllWindowFunction/AllWindowFunction: 每次处理 window 内所有元素</li>
+<li>ProcessWindowFunction/WindowFunction: 每次处理一个窗格/pane</li>
 </ul>
-<h3 id="通知TaskManager"><a href="#通知TaskManager" class="headerlink" title="通知TaskManager"></a>通知TaskManager</h3><p>上面提到，finally 的最后阶段会通知 TaskManager，我们来梳理逻辑：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div><div class="line">73</div><div class="line">74</div><div class="line">75</div><div class="line">76</div><div class="line">77</div><div class="line">78</div><div class="line">79</div><div class="line">80</div><div class="line">81</div><div class="line">82</div><div class="line">83</div><div class="line">84</div><div class="line">85</div><div class="line">86</div><div class="line">87</div><div class="line">88</div><div class="line">89</div><div class="line">90</div><div class="line">91</div><div class="line">92</div><div class="line">93</div><div class="line">94</div><div class="line">95</div><div class="line">96</div><div class="line">97</div><div class="line">98</div><div class="line">99</div><div class="line">100</div><div class="line">101</div><div class="line">102</div><div class="line">103</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//TaskManager line444</span></div><div class="line"><span class="comment">// removes the task from the TaskManager and frees all its resources</span></div><div class="line">        <span class="function"><span class="keyword">case</span> <span class="title">TaskInFinalState</span><span class="params">(executionID)</span> </span>=&gt;</div><div class="line">          unregisterTaskAndNotifyFinalState(executionID)</div><div class="line"></div><div class="line"><span class="comment">//TaskManager line1228</span></div><div class="line"><span class="function"><span class="keyword">private</span> def <span class="title">unregisterTaskAndNotifyFinalState</span><span class="params">(executionID: ExecutionAttemptID)</span>: Unit </span>= &#123;</div><div class="line"></div><div class="line">    val task = runningTasks.remove(executionID)</div><div class="line">    <span class="keyword">if</span> (task != <span class="keyword">null</span>) &#123;</div><div class="line"></div><div class="line">      <span class="comment">// the task must be in a terminal state</span></div><div class="line">      <span class="keyword">if</span> (!task.getExecutionState.isTerminal) &#123;</div><div class="line">        <span class="keyword">try</span> &#123;</div><div class="line">          task.failExternally(<span class="keyword">new</span> Exception(<span class="string">"Task is being removed from TaskManager"</span>))</div><div class="line">        &#125; <span class="keyword">catch</span> &#123;</div><div class="line">          <span class="keyword">case</span> e: Exception =&gt; log.error(<span class="string">"Could not properly fail task"</span>, e)</div><div class="line">        &#125;</div><div class="line">      &#125;</div><div class="line"></div><div class="line"><span class="comment">//TaskManager line1251</span></div><div class="line">     self ! decorateMessage(</div><div class="line">        UpdateTaskExecutionState(</div><div class="line">          <span class="keyword">new</span> TaskExecutionState(</div><div class="line">            task.getJobID,</div><div class="line">            task.getExecutionId,</div><div class="line">            task.getExecutionState,</div><div class="line">            task.getFailureCause,</div><div class="line">            accumulators)</div><div class="line">        )</div><div class="line">      )</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line1189</span></div><div class="line">				<span class="keyword">case</span> FAILED:</div><div class="line">					attempt.markFailed(state.getError(userClassLoader));</div><div class="line">					<span class="keyword">return</span> <span class="keyword">true</span>;</div><div class="line"></div><div class="line"><span class="comment">//Execution line658</span></div><div class="line">	<span class="function"><span class="keyword">void</span> <span class="title">markFinished</span><span class="params">(Map&lt;AccumulatorRegistry.Metric, Accumulator&lt;?, ?&gt;&gt; flinkAccumulators, Map&lt;String, Accumulator&lt;?, ?&gt;&gt; userAccumulators)</span> </span>&#123;</div><div class="line"></div><div class="line">		<span class="comment">// this call usually comes during RUNNING, but may also come while still in deploying (very fast tasks!)</span></div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			ExecutionState current = <span class="keyword">this</span>.state;</div><div class="line"></div><div class="line">			<span class="keyword">if</span> (current == RUNNING || current == DEPLOYING) &#123;</div><div class="line"></div><div class="line">				<span class="keyword">if</span> (transitionState(current, FINISHED)) &#123;</div><div class="line">					<span class="keyword">try</span> &#123;</div><div class="line"></div><div class="line"><span class="comment">//Execution line991</span></div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				vertex.notifyStateTransition(attemptId, targetState, error);</div><div class="line">			&#125;</div><div class="line">			<span class="keyword">catch</span> (Throwable t) &#123;</div><div class="line">				LOG.error(<span class="string">"Error while notifying execution graph of execution state transition."</span>, t);</div><div class="line">			&#125;</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line1291</span></div><div class="line">	<span class="function"><span class="keyword">void</span> <span class="title">notifyExecutionChange</span><span class="params">(JobVertexID vertexId, <span class="keyword">int</span> subtask, ExecutionAttemptID executionID, ExecutionState</span></span></div><div class="line">							newExecutionState, Throwable error)</div><div class="line">	&#123;</div><div class="line">     <span class="comment">//...</span></div><div class="line">        <span class="comment">// see what this means for us. currently, the first FAILED state means -&gt; FAILED</span></div><div class="line">		<span class="keyword">if</span> (newExecutionState == ExecutionState.FAILED) &#123;</div><div class="line">			fail(error);</div><div class="line">		&#125;</div><div class="line"></div><div class="line"><span class="comment">//ExecutionGraph line845     </span></div><div class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">fail</span><span class="params">(Throwable t)</span> </span>&#123;</div><div class="line">		<span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</div><div class="line">			JobStatus current = state;</div><div class="line">			<span class="comment">// stay in these states</span></div><div class="line">			<span class="keyword">if</span> (current == JobStatus.FAILING ||</div><div class="line">				current == JobStatus.SUSPENDED ||</div><div class="line">				current.isGloballyTerminalState()) &#123;</div><div class="line">				<span class="keyword">return</span>;</div><div class="line">			&#125; <span class="keyword">else</span> <span class="keyword">if</span> (current == JobStatus.RESTARTING &amp;&amp; transitionState(current, JobStatus.FAILED, t)) &#123;</div><div class="line">				<span class="keyword">synchronized</span> (progressLock) &#123;</div><div class="line">					postRunCleanup();</div><div class="line">					progressLock.notifyAll();</div><div class="line"></div><div class="line">					LOG.info(<span class="string">"Job &#123;&#125; failed during restart."</span>, getJobID());</div><div class="line">					<span class="keyword">return</span>;</div><div class="line">				&#125;</div><div class="line">			&#125; <span class="keyword">else</span> <span class="keyword">if</span> (transitionState(current, JobStatus.FAILING, t)) &#123;</div><div class="line">				<span class="keyword">this</span>.failureCause = t;</div><div class="line"></div><div class="line">				<span class="keyword">if</span> (!verticesInCreationOrder.isEmpty()) &#123;</div><div class="line">					<span class="comment">// cancel all. what is failed will not cancel but stay failed</span></div><div class="line">					<span class="keyword">for</span> (ExecutionJobVertex ejv : verticesInCreationOrder) &#123;</div><div class="line">						ejv.cancel();</div><div class="line">					&#125;</div><div class="line">				&#125; <span class="keyword">else</span> &#123;</div><div class="line">					<span class="comment">// set the state of the job to failed</span></div><div class="line">					transitionState(JobStatus.FAILING, JobStatus.FAILED, t);</div><div class="line">				&#125;</div><div class="line"></div><div class="line">				<span class="keyword">return</span>;</div><div class="line">			&#125;</div><div class="line"></div><div class="line">			<span class="comment">// no need to treat other states</span></div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
-<p>总结其逻辑：</p>
+<p>继承关系如下：<br><img src="windowfunc-extend.png" alt="windowfunc-extend.png"><br>flink 内部在计算的时候使用的是 InternalWindowFunction，在基础 function 的基础上封装了一些运行时环境和配置。</p>
+<h3 id="WindowAssigner"><a href="#WindowAssigner" class="headerlink" title="WindowAssigner"></a>WindowAssigner</h3><p>一个 WindowAssigner 主要将一个或多个 window 抽象派发给一个元素/消息，在一次 window 的操作中，窗口内的元素会被按照它对应的 key 以及分配的 window 做 group by，一个 key + window 对应的元素集被称作一个窗格/pane。当一个触发器/Trigger 决策出某个 pane 应该触发对应的窗口函数/WindowFunction 时，窗口函数会被应用到 pane 的元素集上输出结果元素</p>
+<h4 id="WindowAssigner-的核心接口"><a href="#WindowAssigner-的核心接口" class="headerlink" title="WindowAssigner 的核心接口"></a>WindowAssigner 的核心接口</h4><ul>
+<li>assignWindows: 将对应的 window/windows 分配给指定的元素</li>
+<li>getDefaultTrigger: 获取指定的 Trigger</li>
+<li>isEventTime: 是否基于 event time 将 window/windows 分配给元素</li>
+</ul>
+<h4 id="WindowAssigner-的实现"><a href="#WindowAssigner-的实现" class="headerlink" title="WindowAssigner 的实现"></a>WindowAssigner 的实现</h4><p>WindowAssigner 的实现可以按照几个维度来划分，具体继承关系如下图：<br><img src="window-assigner-extend.png" alt="window-assigner-extend.png"><br>可以看到一些特性：</p>
 <ul>
-<li>在一些合法性 check 之后，TaskManager 会给自己发送一条路由消息：<code>UpdateTaskExecutionState</code>，TaskManager 继而将这条消息转发给 JobManager</li>
-<li>JobManager 会标志 Job 状态为 FAILING 并通知 JobCli，并且立即停止所有 task 的执行，这时候 CheckpointCoordinator 在执行 checkpoint 的时候感知到 task 失败状态会立即返回，停止 checkpoint</li>
+<li>session 类型的窗口对应的 WindowAssigner 是可以被 merge 的，其它不可以</li>
+<li>sliding window 对应的 assigner 分配的 windows 间是可以覆盖的</li>
 </ul>
-<h2 id="异常后的资源释放"><a href="#异常后的资源释放" class="headerlink" title="异常后的资源释放"></a>异常后的资源释放</h2><p>主要包括以下资源：</p>
+<h3 id="Trigger"><a href="#Trigger" class="headerlink" title="Trigger"></a>Trigger</h3><p>Trigger 决定了一个窗格 pane 中的元素触发计算窗口函数的时机，按照上面对 WindowAssigner 的描述，一个元素可以被分到多个 window，按照 key-window 做 grouping 的元素集组成一个 pane，每个 pane 都有自己的 Trigger 实例。Trigger 管理了 event-timer/processing-timer 的注册；同时在处理元素以及对应的 timer event 在 WindowOperator 上触发时<em>决策</em>是否真正触发计算[ FIRE/CONTINUE ]</p>
+<h4 id="Trigger-的核心接口"><a href="#Trigger-的核心接口" class="headerlink" title="Trigger 的核心接口"></a>Trigger 的核心接口</h4><ul>
+<li>onElement: 处理每个添加到 pane 中的元素</li>
+<li>onEventTime: TriggerContext 注册的 event-time timer 被触发时调用</li>
+<li>onProcessingTime: TriggerContext 注册的 processing-time timer 被触发时调用</li>
+<li>onMerge: window 被 merge 时触发</li>
+</ul>
+<p>Trigger 内部定义了 TriggerContext 抽象，用来管理 event/processing-time timer 的注册和状态存储</p>
+<h4 id="Trigger-的实现"><a href="#Trigger-的实现" class="headerlink" title="Trigger 的实现"></a>Trigger 的实现</h4><p>继承关系如下图:<br><img src="trigger-extend.png" alt="trigger-extend.png"><br>典型的 trigger 实现用途：</p>
 <ul>
-<li>网络资源：InputGate 和 ResultPartiton 的内存占用</li>
-<li>其他内存：通过 MemoryManager 申请的资源</li>
-<li>缓存资源：lib 包和其他缓存</li>
-<li>线程池：Task 内部持有</li>
+<li>ContinuousEventTimeTrigger：指定的 interval 以及 event window 的边界小于当前 watermark 时触发 onEventTime 计算</li>
+<li>ContinuousProessingTimeTrigger：指定的 interval 触发 onProcessingTime 计算</li>
+<li>CountTrigger: 指定的 maxCount 触发，出发后 maxCount 清零重新累加</li>
+<li>DeltaTrigger: 提供 delta 函数和历史 datapoint 存储，每个元素消费时触发 delta 函数计算</li>
+<li>EventTimeTrigger：event window 的边界小于当前 watermark 时触发 onEventTime 计算</li>
+<li>ProessingTimeTrigger：event window 的边界小于当前 watermark 时触发 onProcessingTime 计算</li>
 </ul>
+<h3 id="WindowOperator"><a href="#WindowOperator" class="headerlink" title="WindowOperator"></a>WindowOperator</h3><p>WindowOperator 是窗口计算算子的核心抽象，使用上面描述的 WindowAssigner 和 Trigger 来完成窗口计算。当一个元素到达时，会通过 KeySelector 分配一个 key，并且通过 WindowAssigner 将该元素分配到多个窗口，也就是多个 pane，后 Trigger 会决策 pane 中的元素被 fire 窗口计算的时机，这里调用的函数为 InternalWindowFunction。我们用一张图来描述这种组成关系：<br><img src="window-op-comp.png" alt="window-op-comp.png"></p>
+<h4 id="WindowOperator-时间事件触发管理"><a href="#WindowOperator-时间事件触发管理" class="headerlink" title="WindowOperator 时间事件触发管理"></a>WindowOperator 时间事件触发管理</h4><p>我们都知道流式计算中对于计算时间主要分为两类：event-time、processing-time，对不同的时间类型，在引擎的内部需要一套管理时间事件触发的机制，典型的 processing-time 按照 interval 定时触发[ 或及时触发单不一定精准 ]，event-time 按照特定的事件触发。<br>在 flink 内部，由以下抽象来管理时间事件的触发：</p>
+<ul>
+<li>InternalTimer: 内部代表一个 timer，封装了对应的 key 、namespace[ 关于 key, namespace 的概念会在分布式快照/StateBackend 设计的部分介绍，这里只需了解，key 代表 timer 触发时的活跃元素 key，namespace 代表特定的窗口，通过 key-namespace 的组合可以唯一确定一个 pane/窗格，触发计算 ] 以及 timestamp，</li>
+<li>InternalTimeService: 用来管理 time 以及相应的 timer，会提供注册/销毁 event-timer/ processing-timer 的接口以及获取当前 processing-time、watermark 的接口，同时会通过回调接口触发相应的 event-time/processing-time 回调。目前的唯一实现是 HeapInternalTimerService，其在堆中维护了两个队列分别存储已注册的 event-timer 和 peocessing-timer</li>
+<li>InternalTimeServiceManager: 用来管理 TaskManager 中所有一个算子的 InternalTimeService，算子可以使用 name 属性申请不同的 InternalTimeService</li>
+<li>ProcessingTimeService：从 StreamTask 中传递过来的管理 processing-timer 注册和回调的服务</li>
+</ul>
+<hr>
+<p>它们之间的关系可以用下图来解释：<br> <img src="timer-event-relation.png" alt="timer-event-relation.png"><br><strong>事件注册/触发流程</strong></p>
+<ul>
+<li><strong>event-time event</strong>: 每个窗格pane[或者 key-window pair] 的 event timer 通过<br>-&gt; <code>WindowOperator.processElement()</code><br>-&gt; <code>Trigger.onElement()</code><br>-&gt; <code>InternalTimeService.registerProcessingTimeTimer()</code> 来注册；<br>通过<br>-&gt; <code>WindowOperator.processElement()</code><br>-&gt; <code>Trigger.onElement()</code><br>或者<br>-&gt; <code>InternalProcessingTimeService.TriggerTask.run()</code><br>-&gt; <code>InternalTimeService.onProcessingTime()</code><br>-&gt; <code>WindowOperator.onProcessingTime()</code><br>-&gt; <code>Trigger.onProcessingTime()</code> 来触发</li>
+<li><strong>processing-time event</strong>: 每个窗格pane[或者 key-window pair] 的 processing-time timer 通过<br>-&gt; <code>WindowOperator.processElement()</code><br>-&gt; <code>Trigger.onElement()</code><br>-&gt; <code>InternalTimeService.registerEventTimeTimer()</code> 来注册；<br>通过<br>-&gt; <code>WindowOperator.processElement()</code><br>-&gt; <code>Trigger.onElement()</code><br>或者<br>-&gt; <code>AbstractStreamOperator.processWatermark()</code><br>-&gt; <code>InternalTimeServiceManager.advanceWatermark()</code><br>-&gt; <code>InternalTimeService.advanceWatermark()</code><br>-&gt; <code>WindowOperator.onEventTime()</code> 来触发</li>
+</ul>
+<p><em>ps: 这里的 InternalTimeServiceManager 在运行时是 operator 粒度，也就是 task 粒度的实例</em></p>
+<h4 id="WindowOperator-窗口状态的更新和计算触发"><a href="#WindowOperator-窗口状态的更新和计算触发" class="headerlink" title="WindowOperator 窗口状态的更新和计算触发"></a>WindowOperator 窗口状态的更新和计算触发</h4><p>上面已经梳理了窗口事件触发的时机，进一步，触发了窗口事件后，会开始窗口结果查询并传递给 InternalWindowFunction，来触发一次窗口的函数计算，并最终将结果输出到下游算子，窗口的内容在 <code>WindowOperator.processElement()</code> 中更新，在 <code>WindowOperator.onEventTime()</code> 和 <code>WindowOperator.onProcessingTime()</code> 中触发窗口计算<br><strong>窗口值更新过程</strong></p>
+<ul>
+<li>在处理每个消息元素时，通过 WindowAssigner 计算元素需要分到什么样时间跨度的 window 里，对于每个分到的 window，会将本次的消息元素追加到 window 对应的 value 结果中，并会调用 <code>Trigger.onElement()</code> 检测是否触发了窗口事件，如果触发，取出对应的 value 结果，触发窗口计算</li>
+<li>如果 WindowAssigner 是具有合并窗口的属性[ session窗口 ]，会将划分出的窗口逐一添加到一个名为 MergingWindowSet 的工具类[ 内部会触发 namespace/window 对应的 value 合并 以及 trigger 触发时间属性的合并，下面会专门讲解 ]</li>
+</ul>
+<p><strong>窗口计算触发</strong><br><em>这里只介绍 event-time 事件触发，processing-time 事件类似</em></p>
+<ul>
+<li>取出 event-timer 对应的 window 的 value 结果[ 一个窗格的累加值 ]，调用 <code>Trigger.onEventTime()</code> 检测是否触发了窗口事件，如果触发，取出对应的 value 结果，触发窗口计算，值得注意的是: InternalTimeService 在将 event-timer 事件发送给 WindowOperator 的时候会同时设置 event-timer 窗口的活跃 key[ 前面提到过一个 key 和 window 可以唯一确定一个 pane ]</li>
+<li>如果 window 已经过期，将对应的 value 结果清理掉</li>
+</ul>
+<h4 id="WindowOperator-可合并窗口的更新和计算"><a href="#WindowOperator-可合并窗口的更新和计算" class="headerlink" title="WindowOperator 可合并窗口的更新和计算"></a>WindowOperator 可合并窗口的更新和计算</h4><p><em>可合并窗口的管理会稍微复杂一些，这里单独介绍</em><br>窗口的合并由一个辅助工具类 MergingWindowSet 来完成，它维护了一个 window -&gt; state-window 的映射关系，什么叫 state-window 呢？它其实是可合并的窗口的唯一的 namespace，用来作为存储合并窗口 value 结果的依据，前面提到 key-window 会作为一个 pane value 结果存储结果的唯一标识，state-window + 触发的活跃 key 可以唯一确定一个合并后窗口里的计算窗格<br>除了合并窗口的时间边界，合并窗口的关键在于状态的合并，这里有两个角色维护了需要合并的状态：</p>
+<ul>
+<li>Trigger: 部分 trigger 自己维护了一些状态，比如下次触发时间等</li>
+<li>WindowOperator: 窗口算子的 value 结果</li>
+</ul>
+<p>Flink 使用 State/状态存储 来保存状态，在窗口合并时，只需将多个窗口的存储状态合并即可，对应的是 InternalMergingState 的 mergeNamesspaces 操作[ Flink 使用 InternalXXXState 来管理算子内部的 active key，活跃 key 的变动对用户透明 ]</p>
+<p>MergingWindowSet 内部将 WindowAssigner 分配的窗口合并后，通过回调函数 MergeFunction 来触发状态的合并</p>
+<p>附一张图解释这个过程：<br><img src="merging-window-set.png" alt="merging-window-set.png"></p>
+<p>在 MergingWindowSet 中维护了每个 window 和对应的 state-window 的对应关系，当触发 window 的窗口计算时，先找到对应的 state-window，取出对应的状态作为该窗口对应的状态结果</p>
+<h3 id="WindowStream"><a href="#WindowStream" class="headerlink" title="WindowStream"></a>WindowStream</h3><p>WindowStream 暴露了一些常用的流处理接口，生成对应的 WindowOperator，这里就不赘述了[ 之前的博客 flink 逻辑计划生成部分详细讲解了 DataStream 和 Operator 之间的关系 ]</p>
+<h2 id="WindowOperator-的快照和恢复"><a href="#WindowOperator-的快照和恢复" class="headerlink" title="WindowOperator 的快照和恢复"></a>WindowOperator 的快照和恢复</h2><p>WindowOperator 的状态恢复包括三部分：用户函数 UDF 的计算状态, 窗口计算结果/window-state 以及 触发 timers，WindowOperator 的状态<br>udf 的快照和恢复封装在 WindowOperator 的父类 AbstractUdfStreamOperator 中，</p>
+<ul>
+<li>udf快照：flink 将 snapshotState 接口暴露给用户，用户可自行时间快照逻辑，flink 拿到快照后将其序列化存储到状态存储</li>
+<li>udf恢复：直接反序列化状态存储并调用 udf 的 restoreState 接口将状态恢复</li>
+</ul>
+<p>window-state 以及 trigger 的状态快照/恢复由 AbstractStreamOperator 来管理[ window-state 的状态又包括 keyed/非 keyed/opsrator-state 三部分，之后的博客会专门讲分布式快照设计 ]</p>
+<p>timers 的恢复在 AbstractStreamOperator 做 snapshot 的时候一起完成，底层是通过 InternalTimeServiceManager 来实现快照/恢复</p>
+<p>这一块儿的设计有一个小的 trick，在 AbstractStreamOperator 内部，统一的快照走<br><code>snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions)</code> 接口，其内部会调用另一个接口：<code>snapshotState(StateSnapshotContext context)</code>，<br>这个接口默认实现了 InternalTimeServiceManager 的 timers 的快照，同时继承了 AbstractStreamOperator 的子类可以继承这个接口开完成额外的状态快照，丰富自己的功能，比如 AbstractUdfStreamOperator 就在默认 timers 快照的基础上，又快照了 udf 的状态<br>恢复的的策略类似，子类可以重载 <code>initializeState(StateInitializationContext context)</code> 来实现自己的恢复策略</p>
 
       
     </div>
@@ -513,6 +575,8 @@
           
             <a href="/tags/flink/" rel="tag"># flink</a>
           
+            <a href="/tags/window/" rel="tag"># window</a>
+          
         </div>
       
 
@@ -524,8 +588,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/02/09/flink-scheduler/" rel="next" title="flink scheduler">
-                <i class="fa fa-chevron-left"></i> flink scheduler
+              <a href="/2017/03/29/flink-kafka-connector/" rel="next" title="flink kafka connector 设计与实现">
+                <i class="fa fa-chevron-left"></i> flink kafka connector 设计与实现
               </a>
             
           </div>
@@ -533,10 +597,6 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2017/03/29/flink-AsyncIO-剖析/" rel="prev" title="flink-AsyncIO-剖析">
-                flink-AsyncIO-剖析 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -679,7 +739,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#异常后的组件通信"><span class="nav-number">2.</span> <span class="nav-text">异常后的组件通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#通知TaskManager"><span class="nav-number">2.1.</span> <span class="nav-text">通知TaskManager</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#异常后的资源释放"><span class="nav-number">3.</span> <span class="nav-text">异常后的资源释放</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#核心抽象"><span class="nav-number">2.</span> <span class="nav-text">核心抽象</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Window"><span class="nav-number">2.1.</span> <span class="nav-text">Window</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WindowFunction"><span class="nav-number">2.2.</span> <span class="nav-text">WindowFunction</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WindowAssigner"><span class="nav-number">2.3.</span> <span class="nav-text">WindowAssigner</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#WindowAssigner-的核心接口"><span class="nav-number">2.3.1.</span> <span class="nav-text">WindowAssigner 的核心接口</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#WindowAssigner-的实现"><span class="nav-number">2.3.2.</span> <span class="nav-text">WindowAssigner 的实现</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Trigger"><span class="nav-number">2.4.</span> <span class="nav-text">Trigger</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Trigger-的核心接口"><span class="nav-number">2.4.1.</span> <span class="nav-text">Trigger 的核心接口</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Trigger-的实现"><span class="nav-number">2.4.2.</span> <span class="nav-text">Trigger 的实现</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WindowOperator"><span class="nav-number">2.5.</span> <span class="nav-text">WindowOperator</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#WindowOperator-时间事件触发管理"><span class="nav-number">2.5.1.</span> <span class="nav-text">WindowOperator 时间事件触发管理</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#WindowOperator-窗口状态的更新和计算触发"><span class="nav-number">2.5.2.</span> <span class="nav-text">WindowOperator 窗口状态的更新和计算触发</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#WindowOperator-可合并窗口的更新和计算"><span class="nav-number">2.5.3.</span> <span class="nav-text">WindowOperator 可合并窗口的更新和计算</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#WindowStream"><span class="nav-number">2.6.</span> <span class="nav-text">WindowStream</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#WindowOperator-的快照和恢复"><span class="nav-number">3.</span> <span class="nav-text">WindowOperator 的快照和恢复</span></a></li></ol></div>
             
 
           </div>
@@ -816,9 +876,9 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/';
-          this.page.identifier = '2017/02/09/flink对用户代码异常处理/';
-          this.page.title = 'flink 对用户代码异常处理';
+          this.page.url = 'https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/';
+          this.page.identifier = '2017/10/18/Flink-WIndowOperator-的设计/';
+          this.page.title = 'Flink WindowOperator 的设计';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://danny0405.disqus.com/embed.js';

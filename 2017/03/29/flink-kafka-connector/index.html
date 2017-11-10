@@ -99,7 +99,7 @@
 <meta property="og:description" content="本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义">
 <meta property="og:image" content="https://danny0405.github.io/component-extend.png">
 <meta property="og:image" content="https://danny0405.github.io/handover.png">
-<meta property="og:updated_time" content="2017-03-29T10:43:28.000Z">
+<meta property="og:updated_time" content="2017-06-20T14:28:20.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="flink kafka connector 设计与实现">
 <meta name="twitter:description" content="本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义">
@@ -444,7 +444,7 @@
 <h2 id="核心组件介绍"><a href="#核心组件介绍" class="headerlink" title="核心组件介绍"></a>核心组件介绍</h2><p>先来看下 flink-kafka-connector 都有哪些核心组件以支撑数据访问</p>
 <p>先来看下整体的组件继承关系：</p>
 <p><img src="component-extend.png" alt="component-extend.png"></p>
-<p>从上图可以直观的看出，FlinkKafkaConsumerBase 是核心类，它继承自 SourceFunction 接口，通过运行 <code>run()</code> 方法获取数据，背后又是通过维护一个 AbstractFetcher 成员获取数据，AbstractFetcher 又维护了一个消费线程 KafkaConsumerThread 来不断与 Kafka 交互；同时我们观察到 AbstractFetcher 为每个消费的 kafka partition 维护了一个状态成员 KafkaTopicPartitionState，来保存 partition 当前消费到的 offset 以及已经 commit 到 kafka 的 offset 信息</p>
+<p>从上图可以直观的看出，FlinkKafkaConsumerBase 是核心类，它继承自 SourceFunction 接口，通过运行 <code>run()</code> 方法获取数据，背后又通过维护一个 AbstractFetcher 成员获取数据，AbstractFetcher 维护了一个消费线程 KafkaConsumerThread 来不断与 Kafka 交互；同时我们观察到 AbstractFetcher 为每个消费的 kafka partition 维护了一个状态成员 KafkaTopicPartitionState，用于保存 partition 当前消费到的 offset 以及已经 commit 到 kafka 的 offset 信息</p>
 <h2 id="消息及-WaterMark-分发策略"><a href="#消息及-WaterMark-分发策略" class="headerlink" title="消息及 WaterMark 分发策略"></a>消息及 WaterMark 分发策略</h2><p>上面我们说到每个 AbstractFetcher 封装了具体的获取数据的逻辑，与此同时，它也提供了三种模式来控制自己生产时间戳 timestamp 和 watermark 的模式：</p>
 <ul>
 <li>NO_TIMESTAMPS_WATERMARKS: fetcher 不生产 timestamp 和 watermarks</li>
@@ -499,7 +499,7 @@
 <h4 id="发起快照策略"><a href="#发起快照策略" class="headerlink" title="发起快照策略"></a>发起快照策略</h4><ul>
 <li>清空之前的快照状态</li>
 <li>从维护的 KafkaTopicPartitionState 获取每个 partition 当前 <em>处理到的</em> offset</li>
-<li>记录下来用户后面 commit 到 kafka 用</li>
+<li>记录下来用于后面 commit 到 kafka 用</li>
 <li>将 offset 信息快照到状态存储</li>
 </ul>
 <h4 id="一轮快照结束后的-commit-策略"><a href="#一轮快照结束后的-commit-策略" class="headerlink" title="一轮快照结束后的 commit 策略"></a>一轮快照结束后的 commit 策略</h4><p>将之前快照的 offset 通过 AbstractFetcher commit 到 kafka</p>
@@ -511,7 +511,7 @@
 <li>控制消费队列的大小</li>
 <li>不会阻塞 offset commit 到 kafka 的逻辑</li>
 </ul>
-<p>HandOver 实际是一个锁控制器，当它收到 commit offset 请求时会优先处理 commit 的逻辑，同时如果 HandOver 中如果有未消费的一批消息，会阻塞消费线程的消费</p>
+<p>HandOver 实际是一个锁控制器，当它收到 commit offset 请求时会优先处理 commit 的逻辑，同时如果 HandOver 中有未消费的一批消息，会阻塞消费线程的消费</p>
 <p>附一张图：</p>
 <p><img src="handover.png" alt="handover.png"></p>
 
@@ -583,6 +583,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2017/10/18/Flink-WIndowOperator-的设计/" rel="prev" title="Flink WindowOperator 的设计">
+                Flink WindowOperator 的设计 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -661,7 +665,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">11</span>
+                <span class="site-state-item-count">12</span>
                 <span class="site-state-item-name">日志</span>
               </a>
             </div>
@@ -683,7 +687,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">6</span>
+                <span class="site-state-item-count">7</span>
                 <span class="site-state-item-name">标签</span>
               </a>
             </div>
