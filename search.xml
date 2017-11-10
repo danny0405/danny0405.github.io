@@ -13,7 +13,7 @@
 <li>TimeWindow: 具有时间窗口属性的窗口，会维护一个起始和终止时间</li>
 <li>GlobalWindow: 没有起始/终止时间的限制，所有的元素都会进一个窗口</li>
 </ul>
-<h3 id="WindowFunction"><a href="#WindowFunction" class="headerlink" title="WindowFunction"></a>WindowFunction</h3><p>在 Trigger 触发的时候，调用的函数，WindowFunction 接口有抽象实现 <code>RichWindowFunction</code>，用来提供对运行时环境 RuntimeContext 的访问及 <code>open()</code> <code>close()</code>  这样的声明周期管理方法</p>
+<h3 id="WindowFunction"><a href="#WindowFunction" class="headerlink" title="WindowFunction"></a>WindowFunction</h3><p>在 Trigger 触发的时候，调用的函数，WindowFunction 接口有抽象实现 <code>RichWindowFunction</code>，用来提供对运行时环境 RuntimeContext 的访问及 <code>open()</code> <code>close()</code>  这样的生命周期管理方法</p>
 <p>按照是否按照grouping key 来处理窗口元素，WindowFunction 可以被分为两类：</p>
 <ul>
 <li>ProcessAllWindowFunction/AllWindowFunction: 每次处理 window 内所有元素</li>
