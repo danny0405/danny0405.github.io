@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://danny0405.github.io/"/>
-  <updated>2017-11-10T05:10:10.000Z</updated>
+  <updated>2017-11-10T05:35:35.000Z</updated>
   <id>https://danny0405.github.io/</id>
   
   <author>
@@ -20,7 +20,7 @@
     <link href="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/"/>
     <id>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/</id>
     <published>2017-10-18T14:02:24.000Z</published>
-    <updated>2017-11-10T05:10:10.000Z</updated>
+    <updated>2017-11-10T05:35:35.000Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>窗口计算是流式计算里比较常见的场景，不同的计算框架在解决窗口计算方面提出了自己的思路，storm 目前还停留在内存计算的基础上，并且尚不支持事件时间滑动；spark-streaming 通过 struct-streaming 实现了事件/处理 时间的精确窗口计算，借助 rdd 的特性很好的保证了窗口计算的精确性；flink 在 data-flow 模型的设计前提下，友好的支持了事件/处理时间的窗口触发，同时借助分布式的状态存储，为窗口中间结果保存提供了较好的扩展性支持</p>
 <h2 id="核心抽象"><a href="#核心抽象" class="headerlink" title="核心抽象"></a>核心抽象</h2><p>这部分会介绍围绕 WindowOperator 的核心抽象，主要涉及窗口计算中的一些核心角色</p>
@@ -107,7 +107,7 @@
 </ul>
 <p>window-state 以及 trigger 的状态快照/恢复由 AbstractStreamOperator 来管理[ window-state 的状态又包括 keyed/非 keyed/opsrator-state 三部分，之后的博客会专门讲分布式快照设计 ]</p>
 <p>timers 的恢复在 AbstractStreamOperator 做 snapshot 的时候一起完成，底层是通过 InternalTimeServiceManager 来实现</p>
-<p>这一块儿的设计有一个小的 trick，在 AbstractStreamOperator 内部，统一的快照走<br><code>snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions)</code> 接口，其内部会调用另一个接口：<code>snapshotState(StateSnapshotContext context)</code>，<br>这个接口默认实现了 InternalTimeServiceManager 的 timers 的快照，同时继承了 AbstractStreamOperator 的子类可以继承这个接口开完成额外的状态快照，丰富自己的功能，比如 AbstractUdfStreamOperator 就在默认 timers 快照的基础上，又快照了 udf 的状态<br>恢复的的策略类似，子类可以重载 <code>initializeState(StateInitializationContext context)</code> 来实现自己的恢复策略</p>
+<p>这一块儿的设计有一个小的 trick，在 AbstractStreamOperator 内部，统一的快照走<br><code>snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions)</code> 接口，其内部会调用另一个接口：<code>snapshotState(StateSnapshotContext context)</code>，<br>这个接口默认实现了 InternalTimeServiceManager 的 timers 的快照，继承了 AbstractStreamOperator 的子类可以继承这个接口完成额外的状态快照，丰富自己的功能，比如 AbstractUdfStreamOperator 就在默认 timers 快照的基础上，又快照了 udf 的状态<br>恢复的的策略类似，子类可以重载 <code>initializeState(StateInitializationContext context)</code> 来实现自己的恢复策略</p>
 ]]></content>
     
     <summary type="html">

@@ -91,7 +91,7 @@
 </ul>
 <p>window-state 以及 trigger 的状态快照/恢复由 AbstractStreamOperator 来管理[ window-state 的状态又包括 keyed/非 keyed/opsrator-state 三部分，之后的博客会专门讲分布式快照设计 ]</p>
 <p>timers 的恢复在 AbstractStreamOperator 做 snapshot 的时候一起完成，底层是通过 InternalTimeServiceManager 来实现</p>
-<p>这一块儿的设计有一个小的 trick，在 AbstractStreamOperator 内部，统一的快照走<br><code>snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions)</code> 接口，其内部会调用另一个接口：<code>snapshotState(StateSnapshotContext context)</code>，<br>这个接口默认实现了 InternalTimeServiceManager 的 timers 的快照，同时继承了 AbstractStreamOperator 的子类可以继承这个接口开完成额外的状态快照，丰富自己的功能，比如 AbstractUdfStreamOperator 就在默认 timers 快照的基础上，又快照了 udf 的状态<br>恢复的的策略类似，子类可以重载 <code>initializeState(StateInitializationContext context)</code> 来实现自己的恢复策略</p>
+<p>这一块儿的设计有一个小的 trick，在 AbstractStreamOperator 内部，统一的快照走<br><code>snapshotState(long checkpointId, long timestamp, CheckpointOptions checkpointOptions)</code> 接口，其内部会调用另一个接口：<code>snapshotState(StateSnapshotContext context)</code>，<br>这个接口默认实现了 InternalTimeServiceManager 的 timers 的快照，继承了 AbstractStreamOperator 的子类可以继承这个接口完成额外的状态快照，丰富自己的功能，比如 AbstractUdfStreamOperator 就在默认 timers 快照的基础上，又快照了 udf 的状态<br>恢复的的策略类似，子类可以重载 <code>initializeState(StateInitializationContext context)</code> 来实现自己的恢复策略</p>
 ]]></content>
     </entry>
     
