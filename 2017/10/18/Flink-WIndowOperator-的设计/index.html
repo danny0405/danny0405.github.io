@@ -91,22 +91,22 @@
 
 
 
-<meta name="description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
+<meta name="description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体细节会单独开一篇文章介绍。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Flink WindowOperator 的设计">
 <meta property="og:url" content="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
+<meta property="og:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体细节会单独开一篇文章介绍。">
 <meta property="og:image" content="https://danny0405.github.io/windowfunc-extend.png">
 <meta property="og:image" content="https://danny0405.github.io/window-assigner-extend.png">
 <meta property="og:image" content="https://danny0405.github.io/trigger-extend.png">
 <meta property="og:image" content="https://danny0405.github.io/window-op-comp.png">
 <meta property="og:image" content="https://danny0405.github.io/timer-event-relation.png">
 <meta property="og:image" content="https://danny0405.github.io/merging-window-set.png">
-<meta property="og:updated_time" content="2017-11-10T05:35:35.000Z">
+<meta property="og:updated_time" content="2017-12-24T08:14:45.592Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Flink WindowOperator 的设计">
-<meta name="twitter:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。">
+<meta name="twitter:description" content="本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体细节会单独开一篇文章介绍。">
 <meta name="twitter:image" content="https://danny0405.github.io/windowfunc-extend.png">
 
 
@@ -428,7 +428,7 @@
 
           
               <div class="post-description">
-                  本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体的介绍会单独开一篇文章介绍。
+                  本文将介绍 flink 1.3.1 版本 WindowOperator 的设计，主要涉及核心的抽象，角色功能以及之间的交互，因为 WindowOperator 的状态存储用到了 flink 的状态存储，所以这里会略带涉及状态存储的知识，具体细节会单独开一篇文章介绍。
               </div>
           
 
@@ -599,6 +599,10 @@
 
           <div class="post-nav-prev post-nav-item">
             
+              <a href="/2017/12/24/Flink-分布式快照的设计-存储/" rel="prev" title="Flink 分布式快照的设计-存储">
+                Flink 分布式快照的设计-存储 <i class="fa fa-chevron-right"></i>
+              </a>
+            
           </div>
         </div>
       
@@ -676,7 +680,7 @@
           
             <div class="site-state-item site-state-posts">
               <a href="/archives">
-                <span class="site-state-item-count">12</span>
+                <span class="site-state-item-count">13</span>
                 <span class="site-state-item-name">日志</span>
               </a>
             </div>
@@ -687,7 +691,7 @@
             
             <div class="site-state-item site-state-categories">
               
-                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-count">2</span>
                 <span class="site-state-item-name">分类</span>
               
             </div>
@@ -698,7 +702,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">7</span>
+                <span class="site-state-item-count">8</span>
                 <span class="site-state-item-name">标签</span>
               </a>
             </div>
@@ -763,7 +767,7 @@
         <div class="copyright" >
   
   &copy; 
-  <span itemprop="copyrightYear">2017</span>
+  <span itemprop="copyrightYear">2018</span>
   <span class="with-love">
     <i class="fa fa-heart"></i>
   </span>

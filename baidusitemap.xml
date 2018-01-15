@@ -4,8 +4,30 @@
 
     
   <url>
+    <loc>https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/</loc>
+    <lastmod>2018-01-14T04:26:11.178Z</lastmod>
+    <data>
+        <display>
+        <title>Flink 分布式快照的设计-存储</title>
+        <pubTime>2017-12-24T08:04:08.000Z</pubTime>
+        
+        <tag>flink</tag>
+         
+        <tag>state-backend</tag>
+         
+         
+           
+             
+              <breadCrumb title="checkpoint" url="https://danny0405.github.io/categories/checkpoint/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
     <loc>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/</loc>
-    <lastmod>2017-11-10T05:35:35.000Z</lastmod>
+    <lastmod>2017-12-24T08:14:45.592Z</lastmod>
     <data>
         <display>
         <title>Flink WindowOperator 的设计</title>
