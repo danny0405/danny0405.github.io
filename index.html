@@ -83,15 +83,15 @@
 
 
 
-<meta name="description" content="热情、对技术偏执、流式计算">
+<meta name="description" content="热情、对技术偏执、猫神">
 <meta property="og:type" content="website">
 <meta property="og:title" content="玉兆的博客">
 <meta property="og:url" content="https://danny0405.github.io/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="热情、对技术偏执、流式计算">
+<meta property="og:description" content="热情、对技术偏执、猫神">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="玉兆的博客">
-<meta name="twitter:description" content="热情、对技术偏执、流式计算">
+<meta name="twitter:description" content="热情、对技术偏执、猫神">
 
 
 
@@ -432,10 +432,20 @@
 
       
         
-          分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。
+          <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。</p>
+<p>代码参考版本: 1.5-SNAPSHOT</p>
+<h2 id="核心模块"><a href="#核心模块" class="headerlink" title="核心模块"></a>核心模块</h2><p>Flink 的分布式快照存储部分设计抽象出了大致 5 个层次：</p>
+<ul>
+<li>最底层是快照的物理存储，包括内存和文件系统两种形式</li>
+<li>再上层是 CheckpointStreamFactory：封装了具体的存储交互，也就是内存/文件系统读写</li>
+<li>再上层是 StateBackend：封装了工作状态的存储逻辑，包括内存和 RocksDB 两种形式</li>
+<li>再上层是 KeyedStateBackend：封装了快照的读写细节，快照分区策略等</li>
+<li>再上层是 State：封装了与 KeyedStateBackend 交互时状态的 val 序列化/反序列化 等逻辑</li>
+</ul>
+<p><em>还有一个 StateContext 比较特殊，它不提供快照功能，只提供临时的状态读写，下面会讲到</em><br>核心模块的总体交互图:<br><img src="checkpoint-sys-interact.png" alt="checkpoint-sys-interact.png"><br>
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2017/12/24/Flink-分布式快照的设计-存储/">
+            <a class="btn" href="/2017/12/24/Flink-分布式快照的设计-存储/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -2029,7 +2039,7 @@
                 alt="chenyuzhao" />
             
               <p class="site-author-name" itemprop="name">chenyuzhao</p>
-              <p class="site-description motion-element" itemprop="description">热情、对技术偏执、流式计算</p>
+              <p class="site-description motion-element" itemprop="description">热情、对技术偏执、猫神</p>
           </div>
 
           <nav class="site-state motion-element">

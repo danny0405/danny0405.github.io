@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://danny0405.github.io/"/>
-  <updated>2018-01-23T06:11:53.292Z</updated>
+  <updated>2018-01-23T15:05:29.371Z</updated>
   <id>https://danny0405.github.io/</id>
   
   <author>
@@ -20,9 +20,10 @@
     <link href="https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/"/>
     <id>https://danny0405.github.io/2017/12/24/Flink-分布式快照的设计-存储/</id>
     <published>2017-12-24T08:04:08.000Z</published>
-    <updated>2018-01-23T06:11:53.292Z</updated>
+    <updated>2018-01-23T15:05:29.371Z</updated>
     
-    <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>代码参考版本: 1.5-SNAPSHOT</p>
+    <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。</p>
+<p>代码参考版本: 1.5-SNAPSHOT</p>
 <h2 id="核心模块"><a href="#核心模块" class="headerlink" title="核心模块"></a>核心模块</h2><p>Flink 的分布式快照存储部分设计抽象出了大致 5 个层次：</p>
 <ul>
 <li>最底层是快照的物理存储，包括内存和文件系统两种形式</li>
@@ -31,7 +32,7 @@
 <li>再上层是 KeyedStateBackend：封装了快照的读写细节，快照分区策略等</li>
 <li>再上层是 State：封装了与 KeyedStateBackend 交互时状态的 val 序列化/反序列化 等逻辑</li>
 </ul>
-<p><em>还有一个 StateContext 比较特殊，它不提供快照功能，只提供临时的状态读写，下面会讲到</em><br>核心模块的总体交互图:<br><img src="checkpoint-sys-interact.png" alt="checkpoint-sys-interact.png"></p>
+<p><em>还有一个 StateContext 比较特殊，它不提供快照功能，只提供临时的状态读写，下面会讲到</em><br>核心模块的总体交互图:<br><img src="checkpoint-sys-interact.png" alt="checkpoint-sys-interact.png"><br><a id="more"></a></p>
 <h3 id="StateSnapshotContext"><a href="#StateSnapshotContext" class="headerlink" title="StateSnapshotContext"></a>StateSnapshotContext</h3><p>StateSnapshotContext 接口对用户提供了不被托管的工作状态 <code>Raw State</code> 的读写， Flink 的快照包括两种类型：被系统 StateBackend 托管的、不被托管自己写的。StateSnapshotContext 提供了算子自己写的快照流，它有一个默认实现 <code>StateSnapshotContextSynchronousImpl</code>，用户可以通过该实现拿到如下信息：</p>
 <ul>
 <li>checkpoint-id: 当前 checkpoint 的 id，是一个单调递增的 long 型值</li>
@@ -179,7 +180,17 @@
     
     <summary type="html">
     
-      分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。
+      &lt;h2 id=&quot;前言&quot;&gt;&lt;a href=&quot;#前言&quot; class=&quot;headerlink&quot; title=&quot;前言&quot;&gt;&lt;/a&gt;前言&lt;/h2&gt;&lt;p&gt;分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。&lt;/p&gt;
+&lt;p&gt;代码参考版本: 1.5-SNAPSHOT&lt;/p&gt;
+&lt;h2 id=&quot;核心模块&quot;&gt;&lt;a href=&quot;#核心模块&quot; class=&quot;headerlink&quot; title=&quot;核心模块&quot;&gt;&lt;/a&gt;核心模块&lt;/h2&gt;&lt;p&gt;Flink 的分布式快照存储部分设计抽象出了大致 5 个层次：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;最底层是快照的物理存储，包括内存和文件系统两种形式&lt;/li&gt;
+&lt;li&gt;再上层是 CheckpointStreamFactory：封装了具体的存储交互，也就是内存/文件系统读写&lt;/li&gt;
+&lt;li&gt;再上层是 StateBackend：封装了工作状态的存储逻辑，包括内存和 RocksDB 两种形式&lt;/li&gt;
+&lt;li&gt;再上层是 KeyedStateBackend：封装了快照的读写细节，快照分区策略等&lt;/li&gt;
+&lt;li&gt;再上层是 State：封装了与 KeyedStateBackend 交互时状态的 val 序列化/反序列化 等逻辑&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;em&gt;还有一个 StateContext 比较特殊，它不提供快照功能，只提供临时的状态读写，下面会讲到&lt;/em&gt;&lt;br&gt;核心模块的总体交互图:&lt;br&gt;&lt;img src=&quot;checkpoint-sys-interact.png&quot; alt=&quot;checkpoint-sys-interact.png&quot;&gt;&lt;br&gt;
     
     </summary>
     
