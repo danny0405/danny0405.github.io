@@ -83,20 +83,26 @@
 
 
 
-<meta name="description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易">
+<meta name="description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了
+因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么
+资源组资源组模型flink 的一个 Instance 可以被划分出多个 Slot，通过初始参数可以指定，他们既可以是 SimpleSlot，也可以是同时">
 <meta property="og:type" content="article">
-<meta property="og:title" content="flink scheduler">
+<meta property="og:title" content="Flink Scheduler">
 <meta property="og:url" content="https://danny0405.github.io/2017/02/09/flink-scheduler/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易">
-<meta property="og:image" content="https://danny0405.github.io/flink-slot-group.png">
+<meta property="og:description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了
+因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么
+资源组资源组模型flink 的一个 Instance 可以被划分出多个 Slot，通过初始参数可以指定，他们既可以是 SimpleSlot，也可以是同时">
+<meta property="og:image" content="https://danny0405.github.io/2017/02/09/flink-scheduler/flink-slot-group.png">
 <meta property="og:image" content="https://danny0405.github.io/flink-streaming-deploy-flow.png">
 <meta property="og:image" content="https://danny0405.github.io/slots_parallelism.svg">
-<meta property="og:updated_time" content="2018-01-23T06:12:31.728Z">
+<meta property="og:updated_time" content="2018-01-23T15:25:42.159Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="flink scheduler">
-<meta name="twitter:description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易">
-<meta name="twitter:image" content="https://danny0405.github.io/flink-slot-group.png">
+<meta name="twitter:title" content="Flink Scheduler">
+<meta name="twitter:description" content="前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了
+因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么
+资源组资源组模型flink 的一个 Instance 可以被划分出多个 Slot，通过初始参数可以指定，他们既可以是 SimpleSlot，也可以是同时">
+<meta name="twitter:image" content="https://danny0405.github.io/2017/02/09/flink-scheduler/flink-slot-group.png">
 
 
 
@@ -132,7 +138,7 @@
 
 
 
-  <title>flink scheduler | 玉兆的博客</title>
+  <title>Flink Scheduler | 玉兆的博客</title>
   
 
 
@@ -339,7 +345,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">flink scheduler</h1>
+          <h1 class="post-title" itemprop="name headline">Flink Scheduler</h1>
         
 
         <div class="post-meta">
@@ -402,7 +408,7 @@
 
           
           
-             <span id="/2017/02/09/flink-scheduler/" class="leancloud_visitors" data-flag-title="flink scheduler">
+             <span id="/2017/02/09/flink-scheduler/" class="leancloud_visitors" data-flag-title="Flink Scheduler">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -419,10 +425,6 @@
           
 
           
-              <div class="post-description">
-                  前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易
-              </div>
-          
 
         </div>
       </header>
@@ -437,11 +439,10 @@
       
 
       
-        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易^_^</p>
+        <p>前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了</p>
 <p>因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么</p>
 <h2 id="资源组"><a href="#资源组" class="headerlink" title="资源组"></a>资源组</h2><h3 id="资源组模型"><a href="#资源组模型" class="headerlink" title="资源组模型"></a>资源组模型</h3><p>flink 的一个 Instance 可以被划分出多个 Slot，通过初始参数可以指定，他们既可以是 SimpleSlot，也可以是同时跑多个 task 的 SharedSlot，为了约束 task 之间的运行时的绑定关系，flink 抽象出了 SlotSharingGroup 和 CoLocationGroup 的概念。</p>
-<p>一个 SlotSharingGroup 规定了一个 Job 的 DAG 图中的哪些 JobVertex 的 sub task 可以部署到一个 SharedSlot 上，这是一个软限制，并不是一定会满足，只是调度的时候有位置偏好，而 CoLocationGroup 是在 SlotSharingGroup 的基础上的硬限制，它限定了 CoLocationGroup 中的 JobVertex 中的 sub task 运行必须是一一对应的：假如 CoLocationGrou 限定了 JobVertex A 和 B ，那么 A 的编号为 i 的 sub task 必须和 B 的编号为 i 的 sub task 跑在一起。假如一个 job 的运算逻辑包括 source -&gt; head -&gt; tail -&gt; sink，那么它的 task 运行时限制关系见下图：</p>
-<p><img src="flink-slot-group.png" alt="flink-slot-group.png"></p>
+<p>一个 SlotSharingGroup 规定了一个 Job 的 DAG 图中的哪些 JobVertex 的 sub task 可以部署到一个 SharedSlot 上，这是一个软限制，并不是一定会满足，只是调度的时候有位置偏好，而 CoLocationGroup 是在 SlotSharingGroup 的基础上的硬限制，它限定了 CoLocationGroup 中的 JobVertex 中的 sub task 运行必须是一一对应的：假如 CoLocationGrou 限定了 JobVertex A 和 B ，那么 A 的编号为 i 的 sub task 必须和 B 的编号为 i 的 sub task 跑在一起。假如一个 job 的运算逻辑包括 source -&gt; head -&gt; tail -&gt; sink，那么它的 task 运行时限制关系见下图：<br><img src="/2017/02/09/flink-scheduler/flink-slot-group.png" alt="flink-slot-group" title="flink-slot-group"><br><a id="more"></a></p>
 <h3 id="资源组-1"><a href="#资源组-1" class="headerlink" title="资源组"></a>资源组</h3><h4 id="SlotSharingGroup"><a href="#SlotSharingGroup" class="headerlink" title="SlotSharingGroup"></a>SlotSharingGroup</h4><p>上面已经提到 SlotSharingGroup 具有绑定 JobVertex 的 sub task 运行的作用，用户可以自己为 JobVertex 定义一个 SlotSharingGroup，如果不定义的话使用名为 default 的 SlotSharingGroup，定义的接口如下：</p>
 <p><code>someStream.filter(...).slotSharingGroup(&quot;name&quot;);</code></p>
 <h4 id="ColocationGroup"><a href="#ColocationGroup" class="headerlink" title="ColocationGroup"></a>ColocationGroup</h4><p>ColocationGroup 通过 CoLocationConstraint 来管理一个 SharedSlot 上的 sub task</p>
@@ -585,7 +586,7 @@
   </li>
   <li class="post-copyright-link">
     <strong>本文链接：</strong>
-    <a href="https://danny0405.github.io/2017/02/09/flink-scheduler/" title="flink scheduler">https://danny0405.github.io/2017/02/09/flink-scheduler/</a>
+    <a href="https://danny0405.github.io/2017/02/09/flink-scheduler/" title="Flink Scheduler">https://danny0405.github.io/2017/02/09/flink-scheduler/</a>
   </li>
   <li class="post-copyright-license">
     <strong>版权声明： </strong>
@@ -613,8 +614,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2017/02/09/flink-watermark-checkpoint/" rel="next" title="flink watermark and checkpoint">
-                <i class="fa fa-chevron-left"></i> flink watermark and checkpoint
+              <a href="/2017/02/09/flink-watermark-checkpoint/" rel="next" title="Flink Watermark & Checkpoint">
+                <i class="fa fa-chevron-left"></i> Flink Watermark & Checkpoint
               </a>
             
           </div>
@@ -623,8 +624,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2017/02/09/flink对用户代码异常处理/" rel="prev" title="flink 对用户代码异常处理">
-                flink 对用户代码异常处理 <i class="fa fa-chevron-right"></i>
+              <a href="/2017/02/09/flink对用户代码异常处理/" rel="prev" title="Flink 对用户代码异常处理">
+                Flink 对用户代码异常处理 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -816,7 +817,7 @@ var jiathis_config={
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#前言"><span class="nav-number">1.</span> <span class="nav-text">前言</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#资源组"><span class="nav-number">2.</span> <span class="nav-text">资源组</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#资源组模型"><span class="nav-number">2.1.</span> <span class="nav-text">资源组模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#资源组-1"><span class="nav-number">2.2.</span> <span class="nav-text">资源组</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#SlotSharingGroup"><span class="nav-number">2.2.1.</span> <span class="nav-text">SlotSharingGroup</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ColocationGroup"><span class="nav-number">2.2.2.</span> <span class="nav-text">ColocationGroup</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#资源Slot"><span class="nav-number">2.3.</span> <span class="nav-text">资源Slot</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#SharedSlot"><span class="nav-number">2.3.1.</span> <span class="nav-text">SharedSlot</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#SimpleSlot"><span class="nav-number">2.3.2.</span> <span class="nav-text">SimpleSlot</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#SlotSharingGroupAssignment"><span class="nav-number">2.3.3.</span> <span class="nav-text">SlotSharingGroupAssignment</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Slot初始划分"><span class="nav-number">2.3.3.1.</span> <span class="nav-text">Slot初始划分</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#为Task分配-SharedSlot"><span class="nav-number">2.3.3.2.</span> <span class="nav-text">为Task分配 SharedSlot</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#无-CoLocationConstraint-限制的资源划分策略"><span class="nav-number">2.3.3.2.1.</span> <span class="nav-text">无 CoLocationConstraint 限制的资源划分策略</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#有-CoLocationConstraint-限制的资源划分策略"><span class="nav-number">2.3.3.2.2.</span> <span class="nav-text">有 CoLocationConstraint 限制的资源划分策略</span></a></li></ol></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#调度器"><span class="nav-number">3.</span> <span class="nav-text">调度器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#调度细节"><span class="nav-number">3.1.</span> <span class="nav-text">调度细节</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#约束信息的生成"><span class="nav-number">3.1.1.</span> <span class="nav-text">约束信息的生成</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#SlotSharingGroup-1"><span class="nav-number">3.1.1.1.</span> <span class="nav-text">SlotSharingGroup</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ColocationConstraint"><span class="nav-number">3.1.1.2.</span> <span class="nav-text">ColocationConstraint</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#prefferedLocations"><span class="nav-number">3.1.1.3.</span> <span class="nav-text">prefferedLocations</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#触发调度"><span class="nav-number">3.2.</span> <span class="nav-text">触发调度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#调度流程"><span class="nav-number">3.3.</span> <span class="nav-text">调度流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Slot的资源隔离"><span class="nav-number">3.4.</span> <span class="nav-text">Slot的资源隔离</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#资源组"><span class="nav-number">1.</span> <span class="nav-text">资源组</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#资源组模型"><span class="nav-number">1.1.</span> <span class="nav-text">资源组模型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#资源组-1"><span class="nav-number">1.2.</span> <span class="nav-text">资源组</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#SlotSharingGroup"><span class="nav-number">1.2.1.</span> <span class="nav-text">SlotSharingGroup</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ColocationGroup"><span class="nav-number">1.2.2.</span> <span class="nav-text">ColocationGroup</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#资源Slot"><span class="nav-number">1.3.</span> <span class="nav-text">资源Slot</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#SharedSlot"><span class="nav-number">1.3.1.</span> <span class="nav-text">SharedSlot</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#SimpleSlot"><span class="nav-number">1.3.2.</span> <span class="nav-text">SimpleSlot</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#SlotSharingGroupAssignment"><span class="nav-number">1.3.3.</span> <span class="nav-text">SlotSharingGroupAssignment</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#Slot初始划分"><span class="nav-number">1.3.3.1.</span> <span class="nav-text">Slot初始划分</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#为Task分配-SharedSlot"><span class="nav-number">1.3.3.2.</span> <span class="nav-text">为Task分配 SharedSlot</span></a><ol class="nav-child"><li class="nav-item nav-level-6"><a class="nav-link" href="#无-CoLocationConstraint-限制的资源划分策略"><span class="nav-number">1.3.3.2.1.</span> <span class="nav-text">无 CoLocationConstraint 限制的资源划分策略</span></a></li><li class="nav-item nav-level-6"><a class="nav-link" href="#有-CoLocationConstraint-限制的资源划分策略"><span class="nav-number">1.3.3.2.2.</span> <span class="nav-text">有 CoLocationConstraint 限制的资源划分策略</span></a></li></ol></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#调度器"><span class="nav-number">2.</span> <span class="nav-text">调度器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#调度细节"><span class="nav-number">2.1.</span> <span class="nav-text">调度细节</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#约束信息的生成"><span class="nav-number">2.1.1.</span> <span class="nav-text">约束信息的生成</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#SlotSharingGroup-1"><span class="nav-number">2.1.1.1.</span> <span class="nav-text">SlotSharingGroup</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ColocationConstraint"><span class="nav-number">2.1.1.2.</span> <span class="nav-text">ColocationConstraint</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#prefferedLocations"><span class="nav-number">2.1.1.3.</span> <span class="nav-text">prefferedLocations</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#触发调度"><span class="nav-number">2.2.</span> <span class="nav-text">触发调度</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#调度流程"><span class="nav-number">2.3.</span> <span class="nav-text">调度流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Slot的资源隔离"><span class="nav-number">2.4.</span> <span class="nav-text">Slot的资源隔离</span></a></li></ol></li></ol></div>
             
 
           </div>
@@ -981,7 +982,7 @@ var jiathis_config={
         var disqus_config = function () {
           this.page.url = 'https://danny0405.github.io/2017/02/09/flink-scheduler/';
           this.page.identifier = '2017/02/09/flink-scheduler/';
-          this.page.title = 'flink scheduler';
+          this.page.title = 'Flink Scheduler';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://danny0405.disqus.com/embed.js';

@@ -683,7 +683,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/03/29/flink-kafka-connector/" itemprop="url">flink kafka connector 设计与实现</a></h1>
+                <a class="post-title-link" href="/2017/03/29/flink-kafka-connector/" itemprop="url">Flink Kafka Connector 设计与实现</a></h1>
         
 
         <div class="post-meta">
@@ -746,7 +746,7 @@
 
           
           
-             <span id="/2017/03/29/flink-kafka-connector/" class="leancloud_visitors" data-flag-title="flink kafka connector 设计与实现">
+             <span id="/2017/03/29/flink-kafka-connector/" class="leancloud_visitors" data-flag-title="Flink Kafka Connector 设计与实现">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -851,7 +851,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/03/29/flink-AsyncIO-剖析/" itemprop="url">flink-AsyncIO-剖析</a></h1>
+                <a class="post-title-link" href="/2017/03/29/flink-AsyncIO-剖析/" itemprop="url">Flink AsyncIO 剖析</a></h1>
         
 
         <div class="post-meta">
@@ -914,7 +914,7 @@
 
           
           
-             <span id="/2017/03/29/flink-AsyncIO-剖析/" class="leancloud_visitors" data-flag-title="flink-AsyncIO-剖析">
+             <span id="/2017/03/29/flink-AsyncIO-剖析/" class="leancloud_visitors" data-flag-title="Flink AsyncIO 剖析">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1019,7 +1019,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/09/flink对用户代码异常处理/" itemprop="url">flink 对用户代码异常处理</a></h1>
+                <a class="post-title-link" href="/2017/02/09/flink对用户代码异常处理/" itemprop="url">Flink 对用户代码异常处理</a></h1>
         
 
         <div class="post-meta">
@@ -1082,7 +1082,7 @@
 
           
           
-             <span id="/2017/02/09/flink对用户代码异常处理/" class="leancloud_visitors" data-flag-title="flink 对用户代码异常处理">
+             <span id="/2017/02/09/flink对用户代码异常处理/" class="leancloud_visitors" data-flag-title="Flink 对用户代码异常处理">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1187,7 +1187,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/09/flink-scheduler/" itemprop="url">flink scheduler</a></h1>
+                <a class="post-title-link" href="/2017/02/09/flink-scheduler/" itemprop="url">Flink Scheduler</a></h1>
         
 
         <div class="post-meta">
@@ -1250,7 +1250,7 @@
 
           
           
-             <span id="/2017/02/09/flink-scheduler/" class="leancloud_visitors" data-flag-title="flink scheduler">
+             <span id="/2017/02/09/flink-scheduler/" class="leancloud_visitors" data-flag-title="Flink Scheduler">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1282,10 +1282,13 @@
 
       
         
-          前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易
+          <p>前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了</p>
+<p>因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么</p>
+<h2 id="资源组"><a href="#资源组" class="headerlink" title="资源组"></a>资源组</h2><h3 id="资源组模型"><a href="#资源组模型" class="headerlink" title="资源组模型"></a>资源组模型</h3><p>flink 的一个 Instance 可以被划分出多个 Slot，通过初始参数可以指定，他们既可以是 SimpleSlot，也可以是同时跑多个 task 的 SharedSlot，为了约束 task 之间的运行时的绑定关系，flink 抽象出了 SlotSharingGroup 和 CoLocationGroup 的概念。</p>
+<p>一个 SlotSharingGroup 规定了一个 Job 的 DAG 图中的哪些 JobVertex 的 sub task 可以部署到一个 SharedSlot 上，这是一个软限制，并不是一定会满足，只是调度的时候有位置偏好，而 CoLocationGroup 是在 SlotSharingGroup 的基础上的硬限制，它限定了 CoLocationGroup 中的 JobVertex 中的 sub task 运行必须是一一对应的：假如 CoLocationGrou 限定了 JobVertex A 和 B ，那么 A 的编号为 i 的 sub task 必须和 B 的编号为 i 的 sub task 跑在一起。假如一个 job 的运算逻辑包括 source -&gt; head -&gt; tail -&gt; sink，那么它的 task 运行时限制关系见下图：<br><img src="/2017/02/09/flink-scheduler/flink-slot-group.png" alt="flink-slot-group" title="flink-slot-group"><br>
           <!--noindex-->
           <div class="post-button text-center">
-            <a class="btn" href="/2017/02/09/flink-scheduler/">
+            <a class="btn" href="/2017/02/09/flink-scheduler/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1355,7 +1358,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/09/flink-watermark-checkpoint/" itemprop="url">flink watermark and checkpoint</a></h1>
+                <a class="post-title-link" href="/2017/02/09/flink-watermark-checkpoint/" itemprop="url">Flink Watermark & Checkpoint</a></h1>
         
 
         <div class="post-meta">
@@ -1418,7 +1421,7 @@
 
           
           
-             <span id="/2017/02/09/flink-watermark-checkpoint/" class="leancloud_visitors" data-flag-title="flink watermark and checkpoint">
+             <span id="/2017/02/09/flink-watermark-checkpoint/" class="leancloud_visitors" data-flag-title="Flink Watermark & Checkpoint">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1523,7 +1526,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/09/flink网络栈/" itemprop="url">flink 网络栈</a></h1>
+                <a class="post-title-link" href="/2017/02/09/flink网络栈/" itemprop="url">Flink 网络栈</a></h1>
         
 
         <div class="post-meta">
@@ -1586,7 +1589,7 @@
 
           
           
-             <span id="/2017/02/09/flink网络栈/" class="leancloud_visitors" data-flag-title="flink 网络栈">
+             <span id="/2017/02/09/flink网络栈/" class="leancloud_visitors" data-flag-title="Flink 网络栈">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1691,7 +1694,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/09/taskmanager基本组件/" itemprop="url">taskmanager 基本组件</a></h1>
+                <a class="post-title-link" href="/2017/02/09/taskmanager基本组件/" itemprop="url">TaskManager 基本组件</a></h1>
         
 
         <div class="post-meta">
@@ -1754,7 +1757,7 @@
 
           
           
-             <span id="/2017/02/09/taskmanager基本组件/" class="leancloud_visitors" data-flag-title="taskmanager 基本组件">
+             <span id="/2017/02/09/taskmanager基本组件/" class="leancloud_visitors" data-flag-title="TaskManager 基本组件">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
@@ -1859,7 +1862,7 @@
         
           <h1 class="post-title" itemprop="name headline">
                 
-                <a class="post-title-link" href="/2017/02/08/flink算子的生命周期/" itemprop="url">flink 算子的生命周期</a></h1>
+                <a class="post-title-link" href="/2017/02/08/flink算子的生命周期/" itemprop="url">Flink Operator 的生命周期</a></h1>
         
 
         <div class="post-meta">
@@ -1922,7 +1925,7 @@
 
           
           
-             <span id="/2017/02/08/flink算子的生命周期/" class="leancloud_visitors" data-flag-title="flink 算子的生命周期">
+             <span id="/2017/02/08/flink算子的生命周期/" class="leancloud_visitors" data-flag-title="Flink Operator 的生命周期">
                <span class="post-meta-divider">|</span>
                <span class="post-meta-item-icon">
                  <i class="fa fa-eye"></i>
