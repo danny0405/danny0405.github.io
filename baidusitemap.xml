@@ -4,213 +4,19 @@
 
     
   <url>
-    <loc>https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/</loc>
-    <lastmod>2018-01-14T04:26:11.178Z</lastmod>
+    <loc>https://danny0405.github.io/2017/02/08/jobmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/</loc>
+    <lastmod>2018-01-23T06:12:37.549Z</lastmod>
     <data>
         <display>
-        <title>Flink 分布式快照的设计-存储</title>
-        <pubTime>2017-12-24T08:04:08.000Z</pubTime>
+        <title>jobmanager 基本组件</title>
+        <pubTime>2017-02-08T14:22:33.000Z</pubTime>
         
-        <tag>flink</tag>
-         
-        <tag>state-backend</tag>
+        <tag>Flink组件</tag>
          
          
            
              
-              <breadCrumb title="checkpoint" url="https://danny0405.github.io/categories/checkpoint/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/</loc>
-    <lastmod>2017-12-24T08:14:45.592Z</lastmod>
-    <data>
-        <display>
-        <title>Flink WindowOperator 的设计</title>
-        <pubTime>2017-10-18T14:02:24.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-        <tag>window</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/03/29/flink-kafka-connector/</loc>
-    <lastmod>2017-06-20T14:28:20.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink kafka connector 设计与实现</title>
-        <pubTime>2017-03-29T10:40:48.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-        <tag>kafka</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/03/29/flink-AsyncIO-%E5%89%96%E6%9E%90/</loc>
-    <lastmod>2017-03-29T10:32:33.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink-AsyncIO-剖析</title>
-        <pubTime>2017-03-29T10:29:27.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-        <tag>async io</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/</loc>
-    <lastmod>2017-02-13T13:39:58.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink watermark and checkpoint</title>
-        <pubTime>2017-02-09T05:44:06.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-        <tag>watermark</tag>
-         
-        <tag>checkpoint</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/09/taskmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/</loc>
-    <lastmod>2017-02-13T13:34:57.000Z</lastmod>
-    <data>
-        <display>
-        <title>taskmanager 基本组件</title>
-        <pubTime>2017-02-09T04:41:53.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-        <tag>source_code</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/09/flink%E5%AF%B9%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/</loc>
-    <lastmod>2017-02-13T13:32:37.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink 对用户代码异常处理</title>
-        <pubTime>2017-02-09T05:51:54.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2016/12/03/Flink%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6%E5%92%8C%E9%80%BB%E8%BE%91%E8%AE%A1%E5%88%92/</loc>
-    <lastmod>2017-02-10T02:08:38.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink 集群构建/逻辑计划</title>
-        <pubTime>2016-12-03T03:59:30.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/06/flink%E7%89%A9%E7%90%86%E8%AE%A1%E5%88%92%E7%94%9F%E6%88%90/</loc>
-    <lastmod>2017-02-09T14:11:31.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink 物理计划生成</title>
-        <pubTime>2017-02-06T09:12:21.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
-          
-        </display>
-    </data>
-    </url>
-
-    
-  <url>
-    <loc>https://danny0405.github.io/2017/02/09/flink%E7%BD%91%E7%BB%9C%E6%A0%88/</loc>
-    <lastmod>2017-02-09T10:06:26.000Z</lastmod>
-    <data>
-        <display>
-        <title>flink 网络栈</title>
-        <pubTime>2017-02-09T05:38:48.000Z</pubTime>
-        
-        <tag>flink</tag>
-         
-         
-           
-             
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
           
         </display>
     </data>
@@ -219,18 +25,178 @@
     
   <url>
     <loc>https://danny0405.github.io/2017/02/09/flink-scheduler/</loc>
-    <lastmod>2017-02-09T05:51:24.000Z</lastmod>
+    <lastmod>2018-01-23T06:12:31.728Z</lastmod>
     <data>
         <display>
         <title>flink scheduler</title>
         <pubTime>2017-02-09T05:48:52.000Z</pubTime>
         
-        <tag>flink</tag>
+        <tag>Flink调度</tag>
          
          
            
              
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/</loc>
+    <lastmod>2018-01-23T06:12:25.433Z</lastmod>
+    <data>
+        <display>
+        <title>flink watermark and checkpoint</title>
+        <pubTime>2017-02-09T05:44:06.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/02/09/flink%E5%AF%B9%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/</loc>
+    <lastmod>2018-01-23T06:12:19.146Z</lastmod>
+    <data>
+        <display>
+        <title>flink 对用户代码异常处理</title>
+        <pubTime>2017-02-09T05:51:54.000Z</pubTime>
+        
+        <tag>Flink容错</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/02/09/taskmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/</loc>
+    <lastmod>2018-01-23T06:12:09.765Z</lastmod>
+    <data>
+        <display>
+        <title>taskmanager 基本组件</title>
+        <pubTime>2017-02-09T04:41:53.000Z</pubTime>
+        
+        <tag>Flink组件</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/02/09/flink%E7%BD%91%E7%BB%9C%E6%A0%88/</loc>
+    <lastmod>2018-01-23T06:12:05.803Z</lastmod>
+    <data>
+        <display>
+        <title>flink 网络栈</title>
+        <pubTime>2017-02-09T05:38:48.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/</loc>
+    <lastmod>2018-01-23T06:11:53.292Z</lastmod>
+    <data>
+        <display>
+        <title>Flink 分布式快照的设计-存储</title>
+        <pubTime>2017-12-24T08:04:08.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/</loc>
+    <lastmod>2018-01-23T06:11:39.111Z</lastmod>
+    <data>
+        <display>
+        <title>Flink WindowOperator 的设计</title>
+        <pubTime>2017-10-18T14:02:24.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/03/29/flink-AsyncIO-%E5%89%96%E6%9E%90/</loc>
+    <lastmod>2018-01-23T06:11:29.233Z</lastmod>
+    <data>
+        <display>
+        <title>flink-AsyncIO-剖析</title>
+        <pubTime>2017-03-29T10:29:27.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2017/03/29/flink-kafka-connector/</loc>
+    <lastmod>2018-01-23T06:11:21.379Z</lastmod>
+    <data>
+        <display>
+        <title>flink kafka connector 设计与实现</title>
+        <pubTime>2017-03-29T10:40:48.000Z</pubTime>
+        
+        <tag>Flink组件</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
           
         </display>
     </data>
@@ -239,18 +205,18 @@
     
   <url>
     <loc>https://danny0405.github.io/2017/02/08/flink%E7%AE%97%E5%AD%90%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/</loc>
-    <lastmod>2017-02-08T14:41:28.000Z</lastmod>
+    <lastmod>2018-01-23T06:10:34.183Z</lastmod>
     <data>
         <display>
         <title>flink 算子的生命周期</title>
         <pubTime>2017-02-08T14:35:36.000Z</pubTime>
         
-        <tag>flink</tag>
+        <tag>Flink内部实现</tag>
          
          
            
              
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
           
         </display>
     </data>
@@ -258,19 +224,39 @@
 
     
   <url>
-    <loc>https://danny0405.github.io/2017/02/08/jobmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/</loc>
-    <lastmod>2017-02-08T14:39:39.000Z</lastmod>
+    <loc>https://danny0405.github.io/2017/02/06/flink%E7%89%A9%E7%90%86%E8%AE%A1%E5%88%92%E7%94%9F%E6%88%90/</loc>
+    <lastmod>2018-01-23T06:10:27.488Z</lastmod>
     <data>
         <display>
-        <title>jobmanager 基本组件</title>
-        <pubTime>2017-02-08T14:22:33.000Z</pubTime>
+        <title>flink 物理计划生成</title>
+        <pubTime>2017-02-06T09:12:21.000Z</pubTime>
         
-        <tag>flink</tag>
+        <tag>Flink内部实现</tag>
          
          
            
              
-              <breadCrumb title="Streaming" url="https://danny0405.github.io/categories/Streaming/"/>
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
+          
+        </display>
+    </data>
+    </url>
+
+    
+  <url>
+    <loc>https://danny0405.github.io/2016/12/03/Flink%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6%E5%92%8C%E9%80%BB%E8%BE%91%E8%AE%A1%E5%88%92/</loc>
+    <lastmod>2018-01-23T06:10:15.327Z</lastmod>
+    <data>
+        <display>
+        <title>flink 集群构建/逻辑计划</title>
+        <pubTime>2016-12-03T03:59:30.000Z</pubTime>
+        
+        <tag>Flink内部实现</tag>
+         
+         
+           
+             
+              <breadCrumb title="Flink源码" url="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
           
         </display>
     </data>

@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="https://danny0405.github.io/"/>
-  <updated>2018-01-14T04:26:11.178Z</updated>
+  <updated>2018-01-23T06:11:53.292Z</updated>
   <id>https://danny0405.github.io/</id>
   
   <author>
@@ -20,7 +20,7 @@
     <link href="https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/"/>
     <id>https://danny0405.github.io/2017/12/24/Flink-分布式快照的设计-存储/</id>
     <published>2017-12-24T08:04:08.000Z</published>
-    <updated>2018-01-14T04:26:11.178Z</updated>
+    <updated>2018-01-23T06:11:53.292Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>代码参考版本: 1.5-SNAPSHOT</p>
 <h2 id="核心模块"><a href="#核心模块" class="headerlink" title="核心模块"></a>核心模块</h2><p>Flink 的分布式快照存储部分设计抽象出了大致 5 个层次：</p>
@@ -183,12 +183,10 @@
     
     </summary>
     
-      <category term="checkpoint" scheme="https://danny0405.github.io/categories/checkpoint/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="state-backend" scheme="https://danny0405.github.io/tags/state-backend/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -197,7 +195,7 @@
     <link href="https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-%E7%9A%84%E8%AE%BE%E8%AE%A1/"/>
     <id>https://danny0405.github.io/2017/10/18/Flink-WIndowOperator-的设计/</id>
     <published>2017-10-18T14:02:24.000Z</published>
-    <updated>2017-12-24T08:14:45.592Z</updated>
+    <updated>2018-01-23T06:11:39.111Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>窗口计算是流式计算里比较常见的场景，不同的计算框架在解决窗口计算方面提出了自己的思路，storm 目前还停留在内存计算的基础上，并且尚不支持事件时间滑动；spark-streaming 通过 struct-streaming 实现了事件/处理 时间的精确窗口计算，借助 rdd 的特性很好的保证了窗口计算的精确性；flink 在 data-flow 模型的设计前提下，友好的支持了事件/处理时间的窗口触发，同时借助分布式的状态存储，为窗口中间结果保存提供了较好的扩展性支持</p>
 <h2 id="核心抽象"><a href="#核心抽象" class="headerlink" title="核心抽象"></a>核心抽象</h2><p>这部分会介绍围绕 WindowOperator 的核心抽象，主要涉及窗口计算中的一些核心角色</p>
@@ -293,12 +291,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="window" scheme="https://danny0405.github.io/tags/window/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -307,7 +303,7 @@
     <link href="https://danny0405.github.io/2017/03/29/flink-kafka-connector/"/>
     <id>https://danny0405.github.io/2017/03/29/flink-kafka-connector/</id>
     <published>2017-03-29T10:40:48.000Z</published>
-    <updated>2017-06-20T14:28:20.000Z</updated>
+    <updated>2018-01-23T06:11:21.379Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>Kafka 作为成熟的消息队列目前在大数据场景中应用的越来越广泛，其高性能与多 producer push 多 consumer pull 的消息流非常适合流式计算场景；同时 kafka 是较好的支持回溯消费的队列之一，为各种流式计算框架设计 at-least-once 甚至 exact-once 语义的计算模型提供了可能</p>
 <p>本文将介绍 flink 1.2 的 0.9.0 版本 kafka connector，主要讲解消费模型，快照策略/恢复等，尤其是为什么 flink  kafka connector 借助于 flink 内核的分布式快照算法做到了 exact-once 语义</p>
@@ -392,12 +388,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="kafka" scheme="https://danny0405.github.io/tags/kafka/"/>
+      <category term="Flink组件" scheme="https://danny0405.github.io/tags/Flink%E7%BB%84%E4%BB%B6/"/>
     
   </entry>
   
@@ -406,7 +400,7 @@
     <link href="https://danny0405.github.io/2017/03/29/flink-AsyncIO-%E5%89%96%E6%9E%90/"/>
     <id>https://danny0405.github.io/2017/03/29/flink-AsyncIO-剖析/</id>
     <published>2017-03-29T10:29:27.000Z</published>
-    <updated>2017-03-29T10:32:33.000Z</updated>
+    <updated>2018-01-23T06:11:29.233Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>AsyncIO 是由 flink 1.2 引入的新特性，其目的是优化流处理过程中外部服务访问的耗时造成的瓶颈问题。写过流处理程序的童鞋可能都遇到过这样的场景：如果每条消息都要访问一次外部服务，并且一次 IO 时间较长【e.g 大于 20ms】；亦或者每条消息访问多个外部服务：比如 redis 过滤后写到最终输出，比如双写下游服务等。 这时候整个流处理的瓶颈通常就是外部 IO 了，因为纯 cpu 计算通常是比较快的，一般都在 ms 级【正则匹配、json 解析之类的除外】</p>
 <p>AsyncIO 技术通过发送批量请求平摊网络 IO 开销的方式一定上缓解了这个问题，另外得益于 flink 框架对 watermark 和 checkpoint 的良好支持，AsyncIO 一定程度上保证了消息的顺序性及 exact-once 语义</p>
@@ -554,12 +548,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="async io" scheme="https://danny0405.github.io/tags/async-io/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -568,7 +560,7 @@
     <link href="https://danny0405.github.io/2017/02/09/flink%E5%AF%B9%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86/"/>
     <id>https://danny0405.github.io/2017/02/09/flink对用户代码异常处理/</id>
     <published>2017-02-09T05:51:54.000Z</published>
-    <updated>2017-02-13T13:32:37.000Z</updated>
+    <updated>2018-01-23T06:12:19.146Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>flink 的架构在 flink 基本组件一节已经介绍过，其中的 TaskManager 负责监护 task 的执行，对于每个 task，flink 都会启动一个线程去执行，那么当用户的代码抛出异常时，flink 的处理逻辑是什么呢？</p>
 <h2 id="异常后的组件通信"><a href="#异常后的组件通信" class="headerlink" title="异常后的组件通信"></a>异常后的组件通信</h2><p>一个 flink task 的线程 Runnable 类是 Task.java，我们观察到它的 <code>run()</code> 方法整个被一个大的 try catch 包住，这里重点关注 catch 用户异常之后的部分：</p>
@@ -608,10 +600,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink容错" scheme="https://danny0405.github.io/tags/Flink%E5%AE%B9%E9%94%99/"/>
     
   </entry>
   
@@ -620,7 +612,7 @@
     <link href="https://danny0405.github.io/2017/02/09/flink-scheduler/"/>
     <id>https://danny0405.github.io/2017/02/09/flink-scheduler/</id>
     <published>2017-02-09T05:48:52.000Z</published>
-    <updated>2017-02-09T05:51:24.000Z</updated>
+    <updated>2018-01-23T06:12:31.728Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前面已经介绍了一系列的 flink 任务抽象、网络传输、可靠性机制等细节，有了这些铺垫，终于可以开心的介绍 flink 的任务调度机制了，也是不易^_^</p>
 <p>因为没有这些铺垫，就无法明白 flink 为什么要设计这样的一套调度机制！所以本章节讲解时会多穿插一些为什么</p>
@@ -734,10 +726,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink调度" scheme="https://danny0405.github.io/tags/Flink%E8%B0%83%E5%BA%A6/"/>
     
   </entry>
   
@@ -746,7 +738,7 @@
     <link href="https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/"/>
     <id>https://danny0405.github.io/2017/02/09/flink-watermark-checkpoint/</id>
     <published>2017-02-09T05:44:06.000Z</published>
-    <updated>2017-02-13T13:39:58.000Z</updated>
+    <updated>2018-01-23T06:12:25.433Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在前面一章 flink 网络栈的讲解中，我们介绍了 Barrier 的改变以及 Barrier 在 InputGate 消费数据的过程中扮演的时间对齐作用，同时，我们介绍了 InputProcessor 负责数据读取，同时会追踪 watermark 时间并分发到下游。这里我们从 InputProcessor 开始讲起</p>
 <p>为什么将 Watermark 和 Checkpoint 放在一起介绍，是因为它们在原理上有相似之处：上游节点逐级广播消息给下游节点来完成一次行为</p>
@@ -863,14 +855,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="watermark" scheme="https://danny0405.github.io/tags/watermark/"/>
-    
-      <category term="checkpoint" scheme="https://danny0405.github.io/tags/checkpoint/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -879,7 +867,7 @@
     <link href="https://danny0405.github.io/2017/02/09/flink%E7%BD%91%E7%BB%9C%E6%A0%88/"/>
     <id>https://danny0405.github.io/2017/02/09/flink网络栈/</id>
     <published>2017-02-09T05:38:48.000Z</published>
-    <updated>2017-02-09T10:06:26.000Z</updated>
+    <updated>2018-01-23T06:12:05.803Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本章节主要介绍 flink 的网络交互，包括每个 task 的输入输出管理，内存分配和释放等，因为涉及到内存申请，这里会介绍 flink 的内存管理</p>
 <p><em>我们会从 flink 网络相关的核心抽象开始介绍</em></p>
@@ -1135,10 +1123,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -1147,7 +1135,7 @@
     <link href="https://danny0405.github.io/2017/02/09/taskmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/"/>
     <id>https://danny0405.github.io/2017/02/09/taskmanager基本组件/</id>
     <published>2017-02-09T04:41:53.000Z</published>
-    <updated>2017-02-13T13:34:57.000Z</updated>
+    <updated>2018-01-23T06:12:09.765Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>TaskManager 在 Flink 中也被叫做一个 Instance，统一管理该物理节点上的所有 Flink job 的 tasks 运行，它的功能包括了 task 的启动销毁、内存管理、磁盘IO、网络传输管理等，本章将一一介绍这些功能，方面后续章节的开展</p>
 <h2 id="MemoryManager"><a href="#MemoryManager" class="headerlink" title="MemoryManager"></a>MemoryManager</h2><p><em>先来翻译一下类的 JavaDoc ^_^</em></p>
@@ -1232,12 +1220,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
-    
-      <category term="source_code" scheme="https://danny0405.github.io/tags/source-code/"/>
+      <category term="Flink组件" scheme="https://danny0405.github.io/tags/Flink%E7%BB%84%E4%BB%B6/"/>
     
   </entry>
   
@@ -1246,7 +1232,7 @@
     <link href="https://danny0405.github.io/2017/02/08/flink%E7%AE%97%E5%AD%90%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F/"/>
     <id>https://danny0405.github.io/2017/02/08/flink算子的生命周期/</id>
     <published>2017-02-08T14:35:36.000Z</published>
-    <updated>2017-02-08T14:41:28.000Z</updated>
+    <updated>2018-01-23T06:10:34.183Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>前面已经介绍了 flink 的逻辑计划、物理计划等相关信息，本文将重点介绍 flink 的 operator 以及运行时的 task，后续会介绍 flink task 的调度算法</p>
 <h2 id="算子"><a href="#算子" class="headerlink" title="算子"></a>算子</h2><h3 id="什么是一个算子"><a href="#什么是一个算子" class="headerlink" title="什么是一个算子"></a>什么是一个算子</h3><p>flink 中的一个 operator 代表一个最顶级的 api 接口，拿 streaming 来说就是，在 DataStream 上做诸如 map/reduce/keyBy 等操作均会生成一个算子</p>
@@ -1371,10 +1357,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -1383,7 +1369,7 @@
     <link href="https://danny0405.github.io/2017/02/08/jobmanager%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6/"/>
     <id>https://danny0405.github.io/2017/02/08/jobmanager基本组件/</id>
     <published>2017-02-08T14:22:33.000Z</published>
-    <updated>2017-02-08T14:39:39.000Z</updated>
+    <updated>2018-01-23T06:12:37.549Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>JobManager 是 flink 集群的中控节点，类似于 Apache Storm 的 Nimbus 以及 Apache Spark 的 Driver 的角色，它负责作业的调度、jar 包管理、checkpoint 的协调和发起等，为了后续章节的开展，本文将介绍 flink JobManager 中所部署的一些服务。</p>
 <h2 id="BolbServer"><a href="#BolbServer" class="headerlink" title="BolbServer"></a>BolbServer</h2><p>flink 用来管理二进制大文件的服务，flink JobManager 中启动的 BLOB Server 负责监听请求并派发线程去处理。更进一步，它将负责创建对应的目录结构去存储这些 BLOBs 或者只是临时性地缓存。背后支持的文件系统：本底磁盘</p>
@@ -1492,10 +1478,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink组件" scheme="https://danny0405.github.io/tags/Flink%E7%BB%84%E4%BB%B6/"/>
     
   </entry>
   
@@ -1504,7 +1490,7 @@
     <link href="https://danny0405.github.io/2017/02/06/flink%E7%89%A9%E7%90%86%E8%AE%A1%E5%88%92%E7%94%9F%E6%88%90/"/>
     <id>https://danny0405.github.io/2017/02/06/flink物理计划生成/</id>
     <published>2017-02-06T09:12:21.000Z</published>
-    <updated>2017-02-09T14:11:31.000Z</updated>
+    <updated>2018-01-23T06:10:27.488Z</updated>
     
     <content type="html"><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>上一节讲到业务代码<code>StreamExecutionEnvironment.execute()</code>会触发job的客户端逻辑计划<code>JobGraph</code> 的生成，之后是客户端与<code>JobManager</code>的交互过程</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//ClusterClient line388</span></div><div class="line"><span class="function"><span class="keyword">public</span> JobExecutionResult <span class="title">run</span><span class="params">(JobGraph jobGraph, ClassLoader classLoader)</span> <span class="keyword">throws</span> ProgramInvocationException </span>&#123;</div><div class="line"></div><div class="line">   waitForClusterToBeReady();</div><div class="line"></div><div class="line">   <span class="keyword">final</span> LeaderRetrievalService leaderRetrievalService;</div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      leaderRetrievalService = LeaderRetrievalUtils.createLeaderRetrievalService(flinkConfig);</div><div class="line">   &#125; <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> ProgramInvocationException(<span class="string">"Could not create the leader retrieval service"</span>, e);</div><div class="line">   &#125;</div><div class="line"></div><div class="line">   <span class="keyword">try</span> &#123;</div><div class="line">      logAndSysout(<span class="string">"Submitting job with JobID: "</span> + jobGraph.getJobID() + <span class="string">". Waiting for job completion."</span>);</div><div class="line">      <span class="keyword">this</span>.lastJobExecutionResult = JobClient.submitJobAndWait(actorSystemLoader.get(),</div><div class="line">         leaderRetrievalService, jobGraph, timeout, printStatusDuringExecution, classLoader);</div><div class="line">      <span class="keyword">return</span> <span class="keyword">this</span>.lastJobExecutionResult;</div><div class="line">   &#125; <span class="keyword">catch</span> (JobExecutionException e) &#123;</div><div class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> ProgramInvocationException(<span class="string">"The program execution failed: "</span> + e.getMessage(), e);</div><div class="line">   &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
@@ -1640,10 +1626,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
@@ -1652,7 +1638,7 @@
     <link href="https://danny0405.github.io/2016/12/03/Flink%E5%9F%BA%E6%9C%AC%E7%BB%84%E4%BB%B6%E5%92%8C%E9%80%BB%E8%BE%91%E8%AE%A1%E5%88%92/"/>
     <id>https://danny0405.github.io/2016/12/03/Flink基本组件和逻辑计划/</id>
     <published>2016-12-03T03:59:30.000Z</published>
-    <updated>2017-02-10T02:08:38.000Z</updated>
+    <updated>2018-01-23T06:10:15.327Z</updated>
     
     <content type="html"><![CDATA[<h2 id="概要和背景"><a href="#概要和背景" class="headerlink" title="概要和背景"></a>概要和背景</h2><p><em>flink</em>是一个被誉为 <em>the 4th G</em> 的计算框架，不同的框架特性及其代表项目列表如下：</p>
 <table>
@@ -1837,10 +1823,10 @@
     
     </summary>
     
-      <category term="Streaming" scheme="https://danny0405.github.io/categories/Streaming/"/>
+      <category term="Flink源码" scheme="https://danny0405.github.io/categories/Flink%E6%BA%90%E7%A0%81/"/>
     
     
-      <category term="flink" scheme="https://danny0405.github.io/tags/flink/"/>
+      <category term="Flink内部实现" scheme="https://danny0405.github.io/tags/Flink%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0/"/>
     
   </entry>
   
