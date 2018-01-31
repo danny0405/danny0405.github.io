@@ -4,6 +4,122 @@
   
     
     <entry>
+      <title><![CDATA[Flink-分布式快照的设计-流程]]></title>
+      <url>https://danny0405.github.io/2018/01/29/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E6%B5%81%E7%A8%8B/</url>
+      <content type="html"><![CDATA[<p>在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br><a id="more"></a><br>JobManager 统一通知 source operator 发射 barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】：下游算子收到了它所有的 InputChannel 的 barrier 事件后，它便知道上游算子的一次 checkpoint 已完成，自己也可以做 checkpoint 了，checkpoint 之后继续将 checkpoint 事件广播到下游算子。</p>
+<p>在 exactly-once 语义下，消费端会延迟处理，对齐不同 channel 的 barrier，这在【Flink 网络栈】一文有详细介绍！<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_aligning.svg" alt="stream_aligning" title="stream_aligning"></p>
+<h3 id="Checkpoint-的协调与发起"><a href="#Checkpoint-的协调与发起" class="headerlink" title="Checkpoint 的协调与发起"></a>Checkpoint 的协调与发起</h3><p>Checkpoint 统一由 JobManager 发起，中间涉及到 JobManager 和 TaskManager 的交互，一轮快照可以分为 4 个阶段：</p>
+<ul>
+<li>JobManager checkpoint 的发起</li>
+<li>barrier 的逐级传播</li>
+<li>op/task 的 checkpint 以及 ack 消息回传</li>
+<li>JobManager commit 消息的广播</li>
+</ul>
+<p>整体的交互过程见下图：<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/flink_ckp_flow.png" alt="flink_ckp_flow" title="flink_ckp_flow"></p>
+<h3 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h3><p>Checkpoint 统一由 JobManager 发起，其中的核心抽象是 <code>CheckpointCoordinator</code>，它主要负责协调各个 op/task 的分布式快照，功能主要包括两部分：</p>
+<hr>
+<ol>
+<li>发起 checkpoint 事件消息给 task/op 并收取 checkpoint ack 信息</li>
+<li>维护 task/op 上报的 checkpoint ack 消息中附带的状态句柄 state-handle 的全局视图</li>
+</ol>
+<hr>
+<p>CheckpointCoordinator 可以同时并发执行多个 checkpoint，发起并尚未完全 ack 的 checkpint 被抽象为 <code>PendingCheckpoint</code>，当一个 <code>PendingCheckpoint</code> 被完全 ack 后即可转化一个 <code>CompletedCheckpoint</code>，一个 <code>CompletedCheckpoint</code> 代表一轮成功的分布式快照，并且该抽象可以拿来在 JobManager 端备份做高可用容错策略。</p>
+<p>由于一次发起的分布式快照并不一定执行的顺利【快速的执行完】，会出现各种异常情况，比如执行耗时导致后面发起的快照已执行完而自己却还没有结束、比如整体快照效率低下导致快照任务排队、比如快照期间发生了异常等。CheckpointCoordinator 就是扮演了从 checkpoint 发起到完全结束的整个生命周期的状态、策略协调的作用。</p>
+<h4 id="Checkpoint-属性控制"><a href="#Checkpoint-属性控制" class="headerlink" title="Checkpoint 属性控制"></a>Checkpoint 属性控制</h4><p>CheckpointProperties 包含 8 项属性，只介绍其中 4 项：</p>
+<hr>
+<ol>
+<li>forced：是否是强制，用户指定或者 savepoint 属性为 true</li>
+<li>externalize：是否是外部，savepoint 和 FS 快照为 true</li>
+<li>savepoint：是否是 savepoint</li>
+<li>subsumed：是否已经被包含了，如果比此快照 ckp1 更新的一个 ckp2 成功完成，那么 ckp1 就被称作 subsumed</li>
+</ol>
+<hr>
+<h4 id="CheckPoint-trig-策略"><a href="#CheckPoint-trig-策略" class="headerlink" title="CheckPoint trig 策略"></a>CheckPoint trig 策略</h4><p>对于一般的 checkpoint 来说，CheckpointCoordinator 会不断发起定时任务，触发主动的 checkpint 动作，是非强制的；但对于 savepoint 来说，是一次性的，强制执行的。每轮快照发起的基本策略如下：</p>
+<hr>
+<ol>
+<li>基本的合法性检查：以下情况将取消 checkpoint:<ul>
+<li>CheckpointCoordinator 已 shutdown</li>
+<li>scheduling 取消则停止接受 timer-task</li>
+<li>如果不是强制 checkpoint 并且在排队的 checkpoint 已超过最大限制数</li>
+<li>本次 checkpoint 的时间距离上次成功 checkpoint 的时间大于最小限制</li>
+<li>并不是所有需要 trigger 的 task 都是 RUNNING 状态</li>
+<li>并不是需要 ack 的 task 都是 RUNNING 状态</li>
+<li>获取本次全局递增的 checkpointID 失败</li>
+</ul>
+</li>
+<li>生成中间状态 PendingCheckpoint 并维护到内存映射关系中 checkpointID -&gt; PendingCheckpoint</li>
+<li>遍历所有需要 trigger 的 task 并依次发起 trigger checkpoint request</li>
+<li>如果本次 checkpint 耗费时间超过最大限制，则取消</li>
+<li>若以上发生任何异常，都将取消本次 checkpint</li>
+</ol>
+<hr>
+<h4 id="CheckPoint-ack-策略"><a href="#CheckPoint-ack-策略" class="headerlink" title="CheckPoint ack 策略"></a>CheckPoint ack 策略</h4><p>在 op/task 完成一次状态 checkpint 后便会将快照句柄以 ack 消息的形式发送给 CheckpointCoordinator，后者会维护这一轮快照的全局状态视图，具体的 ack 策略如下：</p>
+<hr>
+<ol>
+<li>从 ack 消息中拿到 checkpointID，并从缓存中取出对应的 checkpoint- ckp1</li>
+<li>若 ckp1 存在，则 <em>执行</em> ckp1 的ack：<code>PendingCheckpoint::acknowledgeTask</code>，会得到 4 种不同的结果：<ul>
+<li>SUCCESS： check ckp1 中所有需要 ack 的 task 是否都已收到 ack 消息，满足则执行以下操作：<ul>
+<li>将 PendingCheckpoint <em>转换为</em> CompletedCheckpoint- cckp1</li>
+<li>如果 cckp1 不是 savepoint，则 <em>存储到</em> CompletedCheckpointStore；并且将 checkpoint 时间早于 cckp1 的 PendingCheckpoint 取消掉</li>
+<li>将 ckp1 从缓存中清除，并立即出发一次 checkpoint scheduling timer-task 的重新调度</li>
+<li>编译所有的 ack executions 列表并发送 ack 完成的消息</li>
+</ul>
+</li>
+<li>DUPLICATE：ack 消息重复接收，直接忽略</li>
+<li>UNKNOWN：未知的 ack 消息，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+<li>DISCARDED： ckp1 已经被 discard，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+</ul>
+</li>
+<li>若 ckp1 存在但是已经被 discard，抛异常</li>
+<li>若 ckp1 不存在，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+</ol>
+<hr>
+<h4 id="trig-ack-commit-节点策略"><a href="#trig-ack-commit-节点策略" class="headerlink" title="trig/ack/commit 节点策略"></a>trig/ack/commit 节点策略</h4><p>既然是快照的 trig/ack 那么就需要一个确定 trig/ack/commit JobVertex 节点的策略，这段策略封装在 <code>StreamingJobGraphGenerator</code>中，具体见下面的代码逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">  <span class="keyword">for</span> (JobVertex vertex : jobVertices.values()) &#123;</div><div class="line">	<span class="keyword">if</span> (vertex.isInputVertex()) &#123;</div><div class="line">		triggerVertices.add(vertex.getID());</div><div class="line">	&#125;</div><div class="line">	commitVertices.add(vertex.getID());</div><div class="line">	ackVertices.add(vertex.getID());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>可以看到，输入源 JobVertex 是 checkpoint 的发起节点，所有的节点都是接收 ack/commit 消息的节点。</p>
+<h3 id="CheckPoint-中间状态-PendingCheckpoint"><a href="#CheckPoint-中间状态-PendingCheckpoint" class="headerlink" title="CheckPoint 中间状态 PendingCheckpoint"></a>CheckPoint 中间状态 PendingCheckpoint</h3><p>PendingCheckpoint 代表一个已经发起，但尚未收到所有需要 ack task ack 消息的 ckeckpoint，一旦所有的 ack 消息都已收到，它就可以转化为一个 CompletedCheckpoint。</p>
+<h4 id="Task-ack-消息的维护"><a href="#Task-ack-消息的维护" class="headerlink" title="Task ack 消息的维护"></a>Task ack 消息的维护</h4><p>首先要说明的是：因为多个 op 可能组合成一个 chained-op 在该 task 中执行，PendingCheckpoint 收到的每条 ack 消息中的 task 快照：<code>TaskStateSnapshot</code> 包含了一个 op/task 中多个 op 实例的快照 <code>OperatorSubtaskState</code> 句柄，为了维护 ack 完成情况，PendingCheckpoint 内部包含了三个映射关系：</p>
+<hr>
+<ol>
+<li>需要 ack 但是尚未收到 ack 消息的 task 物理计划映射：ExecutionAttemptID -&gt; ExecutionVertex/map1</li>
+<li>已经收到 ack 消息的 task 物理计划映射：ExecutionAttemptID -&gt; ExecutionVertex/map2</li>
+<li>算子 ID 和算子状态的映射：OperatorID -&gt; OperatorState</li>
+</ol>
+<hr>
+<p>每次收到 ack 消息中的 <code>TaskStateSnapshot</code> ，其实就是完善 OperatorID -&gt; OperatorState 的过程，当 map1 为空集时就代表这个快照所有需要 ack 的 task 都收到了 ack 消息，也就是可以转换为 CompletedCheckpoint。</p>
+<h4 id="转化为-CompletedCheckpoint"><a href="#转化为-CompletedCheckpoint" class="headerlink" title="转化为 CompletedCheckpoint"></a>转化为 CompletedCheckpoint</h4><p>PendingCheckpoint 转化为 CompletedCheckpoint 后就可以在 JobManager 端做容错策略了，转化的具体策略：</p>
+<ol>
+<li>如果是 savepoint 或者用户指定了外部 checkpoint 的目录，则首先生成<br><code>new SavepointV2(checkpointId, operatorStates.values(), masterState);</code> 并快照到文件系统</li>
+<li>在内存中转化为 CompletedCheckpoint 并返回</li>
+</ol>
+<h3 id="CompletedCheckpoint-JobManager-端持久化"><a href="#CompletedCheckpoint-JobManager-端持久化" class="headerlink" title="CompletedCheckpoint JobManager 端持久化"></a>CompletedCheckpoint JobManager 端持久化</h3><p><em>这里我们只看高可用模式下的情形</em><br>一个 CompletedCheckpoint 代表一次成功的分布式快照，为了后续的快照恢复，在 JobManager 端需要将 CompletedCheckpoint 对象持久化。在高可用模式下的策略是将 CompletedCheckpoint 对象序列化写出到文件系统，拿到一个文件句柄后再将该文件句柄写到 zk 做 HA 等高可用策略。</p>
+<p>高可用模式下使用 <code>ZooKeeperCompletedCheckpointStore</code> 存储 CompletedCheckpoint，存储的逻辑如下：</p>
+<hr>
+<ol>
+<li>先将 CompletedCheckpoint instance 序列化后写入到 FS 中</li>
+<li>将 1 中的文件句柄写入 zookeeper 中，对于一个 Job 来说，可以写入的句柄数量是有限值 N，当快照数量超过 N 之后将会把最旧的快照句柄从 zookeeper 删除【相应的分布式快照的状态也会被清理】，再写入最新的快照</li>
+<li>恢复时将会从 2 中的最新一次 checkpint 恢复</li>
+</ol>
+<hr>
+<h3 id="TaskManager-端-checkpoint"><a href="#TaskManager-端-checkpoint" class="headerlink" title="TaskManager 端 checkpoint"></a>TaskManager 端 checkpoint</h3><p>在 CheckpointCoordinator 发起一次 checkpint 的 trig 之后，TaskManager 会收到消息：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">actorGateway.tell(<span class="keyword">new</span> TriggerCheckpoint(jobId, executionAttemptID, checkpointId, timestamp, checkpointOptions));</div></pre></td></tr></table></figure></p>
+<p>TaskManager 通过 executionAttemptID 拿到对应的 <code>Task</code> 并触发 checkpint barrier 传播，这段逻辑在 <code>StreamTask</code> 中，我们看一下其中的小细节：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// Since both state checkpointing and downstream barrier emission occurs in this</span></div><div class="line"><span class="comment">// lock scope, they are an atomic operation regardless of the order in which they occur.</span></div><div class="line"><span class="comment">// Given this, we immediately emit the checkpoint barriers, so the downstream operators</span></div><div class="line"><span class="comment">// can start their checkpoint work as soon as possible</span></div><div class="line">operatorChain.broadcastCheckpointBarrier(</div><div class="line">    checkpointMetaData.getCheckpointId(),</div><div class="line">    checkpointMetaData.getTimestamp(),</div><div class="line">    checkpointOptions);</div><div class="line"></div><div class="line">checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);</div></pre></td></tr></table></figure></p>
+<p>这里 Flink 会先广播 barrier 后执行本 task 的 checkpint，广播的对象是 <code>CheckpointBarrier</code>，它继承自 <code>RuntimeEvent</code>。<br><code>CheckpointBarrier</code> 中封装了三个参数：</p>
+<hr>
+<ol>
+<li>checkpointID： 逐次递增的 checkpint 序列号</li>
+<li>timestamp：checkpoint 对应的时间戳</li>
+<li>checkpointOptions：checkpint 附带属性</li>
+</ol>
+<hr>
+<p>我们在【Flink 网络栈】中有介绍，下游的消息接收统一经过 <code>StreamInputProcessor</code>，而其中的 <code>BarrierBuffer</code> 会依据 barrier block input-channel，直到所有的 input-channel 都收到了某个 checkpint 对应的 barrier。为了避免死锁，<code>BarrierBuffer</code> 并不会 block 数据的接收，而是会 cache 到机器的 buffer-cache 或磁盘上，只是 block 数据的算子处理。</p>
+<p>当 <code>BarrierBuffer</code> 的 block 释放后，便会触发背后的 op-task 进行 checkpint。</p>
+<p>op/task 快照结束后，会发送一条 ack 消息给 JobManager。</p>
+<h3 id="Checkpoint-的恢复"><a href="#Checkpoint-的恢复" class="headerlink" title="Checkpoint 的恢复"></a>Checkpoint 的恢复</h3><p>CheckPoint 的恢复伴随着 op/task 的恢复过程，在 CheckpointCoordinator 中，首先将 CompletedCheckpointStore 从之前的快照中恢复过来，拿到最新的一次 CompletedCheckpoint，并将各个算子的快照状态 <code>OperatorSubtaskState</code> 应用到 ExecutionVertex 的当前 Execution 中。</p>
+<p>后伴随着 <code>TaskDeploymentDescriptor</code> 一起下发到对应的 <code>TaskManager</code>，<code>TaskManager</code> 在启动分配的 task 时会应用对应的快照句柄进行状态恢复。</p>
+]]></content>
+    </entry>
+    
+    <entry>
       <title><![CDATA[Flink 分布式快照的设计-存储]]></title>
       <url>https://danny0405.github.io/2017/12/24/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E5%AD%98%E5%82%A8/</url>
       <content type="html"><![CDATA[<p>分布式快照是整个 Flink 计算框架中非常核心的模块，Flink 的 checkpoint、状态存储都依赖于其分布式快照；不仅框架自身借助于 chandy-lamda 算法，实现了算子状态的快照和恢复，也对用户暴露了一套简洁的状态存储的 API，用户无需关心快照自身的容错/扩展/一致性，这些 Flink 都已对用户透明；由于分布式快照这块的设计比较复杂，因此将拆成两篇文章来介绍，本篇文章主要介绍分布式快照存储部分的设计，下一篇会介绍快照的流程和细节。</p>
@@ -656,85 +772,7 @@
 <li>AssignerWithPeriodicWatermarks：依据消息中的 timestamp 周期性地驱动 watermark 的递增</li>
 </ul>
 <p>各个场景可以依据业务的需求去继承和实现</p>
-<h2 id="Checkpoint"><a href="#Checkpoint" class="headerlink" title="Checkpoint"></a>Checkpoint</h2><p>CheckPoint 是 flink 保证消息不丢的机制，通过 Barrier 的方式来协调时机，那么什么是 Barrier 呢？</p>
-<p>其实前一章介绍 flink 网络栈 的时候已经有介绍在消费端 flink 对于不同的 Barrier 处理，实际上，Barrier 是用来校准 checkpint 的方式。由于对于一个拓扑结构，只有上游算子 checkpoint 完，下游算子的 cehckpoint 才能开始并有意义，同时下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 Barrier 就是这样一种协调上下游算子的机制。</p>
-<p>JobManager 统一通知源算子发射 Barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】</p>
-<p>当下游算子收到了它所有的 InputChannel 的 Barrier 事件后，它便知道上游算子的一次 checkpoint 已完成，自己也可以做 checkpoint 了，完成之后继续将 checkpoint 事件广播到下游算子</p>
-<p>在 Exact-once 语义下，消费端会延迟消费并校准不同 channel 的消费速率，这在 flink 网络栈一章有详细介绍！</p>
-<h3 id="Checkpoint-的协调与发起"><a href="#Checkpoint-的协调与发起" class="headerlink" title="Checkpoint 的协调与发起"></a>Checkpoint 的协调与发起</h3><p>前面提到过 checkpoint 统一由 JobManager 发起，我们来看相关逻辑：</p>
-<h4 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h4><p>flink 的 checkpoint 统一由 CheckpointCoordinator 来协调，通过将 checkpoint 命令事件发送给相关的 tasks 【源 tasks】，它发起 checkpoint 并且收集 checkpoint 的 ack 消息。</p>
-<h5 id="构造参数"><a href="#构造参数" class="headerlink" title="构造参数"></a>构造参数</h5><p>这里有必要了解一些关键参数，以便我们更加了解 Checkpoint 的细节策略</p>
-<ul>
-<li>baseInternal：快照的间隔</li>
-<li>checkpointTimeout：一次 checkpoint 的超时时间，超时的 checkpoint 会被取消</li>
-<li>maxConcurrentCheckpointAttempts：最多可同时存在的 checkpoint 任务，是对于整个 flink job</li>
-<li>tasksToTrigger：触发分布式 Checkpoint 的起始 tasks，也就是 source tasks</li>
-</ul>
-<h5 id="Checkpoint的发起"><a href="#Checkpoint的发起" class="headerlink" title="Checkpoint的发起"></a>Checkpoint的发起</h5><p>前面的章节我们介绍过 ExecutionGraph【flink物理计划抽象】，它有一个核心接口 <code>enableSnapshotCheckpointing</code> ，这个接口在 JobManager 提交作业的时候被执行，具体见<code>JobManager line1238 from method submitJob</code>。这个接口的逻辑总结如下：</p>
-<ul>
-<li>获取 checkpoint 的发起节点【源节点】，需要 ack 和 commit 的节点【所有节点】</li>
-<li>先关闭已有 checkpoint</li>
-<li>实例化 CheckpointCoordinator 和它的监听 Akka 系统 CheckpointCoordinatorDeActivator，并将 CheckpointCoordinatorDeActivator 注册为 EecutionGraph 的 listener，当作业的执行状态变为 RUNNING 时，会通知 CheckpointCoordinatorDeActivator 启动 CheckpointCoordinator 的 checkpoint 线程</li>
-</ul>
-<p><em>那么 CheckpointCoordinator 在收到这样的消息后会怎么处理呢？</em></p>
-<p>它会发起一个 timer task，定时执行，并且传入的时间为当前的系统时间，由于 CheckpointCoordinator 全局只有一个，这个时间也是全局递增并且唯一的：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line 1020</span></div><div class="line"><span class="keyword">private</span> <span class="class"><span class="keyword">class</span> <span class="title">ScheduledTrigger</span> <span class="keyword">extends</span> <span class="title">TimerTask</span> </span>&#123;</div><div class="line"></div><div class="line">		<span class="meta">@Override</span></div><div class="line">		<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</div><div class="line">			<span class="keyword">try</span> &#123;</div><div class="line">				triggerCheckpoint(System.currentTimeMillis());</div><div class="line">			&#125;</div><div class="line">			<span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">				LOG.error(<span class="string">"Exception while triggering checkpoint"</span>, e);</div><div class="line">			&#125;</div><div class="line">		&#125;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
-<p><em>下面我们来具体分析 checkpoint 的一些核心动作</em></p>
-<h6 id="checkpoint-的触发"><a href="#checkpoint-的触发" class="headerlink" title="checkpoint 的触发"></a>checkpoint 的触发</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line389</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">triggerCheckpoint</span><span class="params">(<span class="keyword">long</span> timestamp, <span class="keyword">long</span> nextCheckpointId)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="comment">// make some eager pre-checks</span></div><div class="line">		<span class="keyword">synchronized</span> (lock) &#123;</div><div class="line">			<span class="comment">// abort if the coordinator has been shutdown in the meantime</span></div><div class="line">			<span class="keyword">if</span> (shutdown) &#123;</div><div class="line">				<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">			&#125;</div><div class="line"><span class="comment">//...</span></div></pre></td></tr></table></figure>
-<p>总结逻辑：</p>
-<ul>
-<li>如果已关闭或优先处理排队请求会总额并发任务超过限制，都会取消此次 checkpoint 的发起</li>
-<li>如果最小间隔时间未达到，也会取消此次 checkpoint</li>
-<li>check 所有的发起节点【源节点】与其他节点都为 RUNNING 状态后才会发起 checkpoint</li>
-<li>发起 checkpoint 并生成一个 PendingCheckpoint 【已经发起但尚未 ack 的 checkpoint】</li>
-<li>每个源节点都会发一条消息给自己的 TaskManager 进行 checkpoint</li>
-</ul>
-<h6 id="取消-CheckPoint-消息的处理"><a href="#取消-CheckPoint-消息的处理" class="headerlink" title="取消 CheckPoint 消息的处理"></a>取消 CheckPoint 消息的处理</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line568</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">receiveDeclineMessage</span><span class="params">(DeclineCheckpoint message)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">   <span class="keyword">if</span> (shutdown || message == <span class="keyword">null</span>) &#123;</div><div class="line">      <span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">   &#125;</div><div class="line">   <span class="keyword">if</span> (!job.equals(message.getJob())) &#123;</div><div class="line">      LOG.error(<span class="string">"Received DeclineCheckpoint message for wrong job: &#123;&#125;"</span>, message);</div><div class="line">      <span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">   &#125;</div><div class="line"><span class="comment">//...</span></div></pre></td></tr></table></figure>
-<p>总结其逻辑：</p>
-<ul>
-<li>如果有对应的 PendingCheckpoint ，取消掉并且如果在其之后还有其它 checkpoint 的话，重新发起它们的 checkpoint 任务</li>
-</ul>
-<h6 id="Ack-Checkpoint-消息的处理"><a href="#Ack-Checkpoint-消息的处理" class="headerlink" title="Ack Checkpoint 消息的处理"></a>Ack Checkpoint 消息的处理</h6><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//CheckpointCoordinator line651</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">receiveAcknowledgeMessage</span><span class="params">(AcknowledgeCheckpoint message)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (shutdown || message == <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">if</span> (!job.equals(message.getJob())) &#123;</div><div class="line">			LOG.error(<span class="string">"Received AcknowledgeCheckpoint message for wrong job: &#123;&#125;"</span>, message);</div><div class="line">			<span class="keyword">return</span> <span class="keyword">false</span>;</div><div class="line">		&#125;</div></pre></td></tr></table></figure>
-<p>总结其逻辑：</p>
-<ul>
-<li>通过消息里的 checkpoint id 找到对应的  PendingCheckpoint，记录下 对应的 JobVertex 下某个 ExecutionVertex 的 ack 状态</li>
-<li>PendingCheckpoint 里维护了该次 checkpoint 需要 ack 的全部 ExecutionVertex</li>
-<li>如果全部 ack 完成，则清除 PendingCheckpoint 里维护的状态数据并将句柄转化给 CompletedCheckpoint 来维护</li>
-<li>丢弃过时的 checkpoint 任务，并重新出发新的 checkpoint</li>
-<li>如果全部 ack 完成，通知对应的 TaskManager checkpoint 已完成【checkpoint commit 阶段】，然后通过 CompletedCheckpointStore 将 CompletedCheckpoint 序列化并存储，高可用模式下为 ZK 的方式，具体细节见章节：【flink job manager 基本组件】，将来恢复时，将每个节点需要的句柄注入到状态中，之后算子启动时将状态数据附属于 TaskDeploymentDescriptor 之中分发给 TaskManager 去执行</li>
-</ul>
-<h3 id="Checkpoint-的消息流"><a href="#Checkpoint-的消息流" class="headerlink" title="Checkpoint 的消息流"></a>Checkpoint 的消息流</h3><p>上面我们说到 TaskManager 收到 AbstractCheckpointMessage 消息，并处理，我们来看核心逻辑：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//TaskManager line520</span></div><div class="line"><span class="function"><span class="keyword">private</span> def <span class="title">handleCheckpointingMessage</span><span class="params">(actorMessage: AbstractCheckpointMessage)</span>: Unit </span>= &#123;</div><div class="line"></div><div class="line">    actorMessage match &#123;</div><div class="line">      <span class="keyword">case</span> message: TriggerCheckpoint =&gt;</div><div class="line">        val taskExecutionId = message.getTaskExecutionId</div><div class="line">        val checkpointId = message.getCheckpointId</div><div class="line">        val timestamp = message.getTimestamp</div><div class="line"></div><div class="line">        log.debug(s<span class="string">"Receiver TriggerCheckpoint $checkpointId@$timestamp for $taskExecutionId."</span>)</div><div class="line"></div><div class="line"><span class="comment">//...</span></div><div class="line"><span class="comment">//Task.java line927</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">triggerCheckpointBarrier</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> checkpointID, <span class="keyword">final</span> <span class="keyword">long</span> checkpointTimestamp)</span> </span>&#123;</div><div class="line">		AbstractInvokable invokable = <span class="keyword">this</span>.invokable;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (executionState == ExecutionState.RUNNING &amp;&amp; invokable != <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">if</span> (invokable <span class="keyword">instanceof</span> StatefulTask) &#123;</div><div class="line"></div><div class="line">				<span class="comment">// build a local closure</span></div><div class="line">				<span class="keyword">final</span> StatefulTask&lt;?&gt; statefulTask = (StatefulTask&lt;?&gt;) invokable;</div><div class="line">				<span class="keyword">final</span> String taskName = taskNameWithSubtask;       </div><div class="line"></div><div class="line"><span class="comment">//...</span></div><div class="line"><span class="comment">//StreamTask line577</span></div><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">boolean</span> <span class="title">performCheckpoint</span><span class="params">(<span class="keyword">final</span> <span class="keyword">long</span> checkpointId, <span class="keyword">final</span> <span class="keyword">long</span> timestamp)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		LOG.debug(<span class="string">"Starting checkpoint &#123;&#125; on task &#123;&#125;"</span>, checkpointId, getName());</div><div class="line"></div><div class="line">		<span class="keyword">synchronized</span> (lock) &#123;</div><div class="line">			<span class="keyword">if</span> (isRunning) &#123;</div></pre></td></tr></table></figure>
-<p>总结其逻辑：</p>
-<ul>
-<li>先是通过 TaskManager 进行消息路由，对于 TriggerCheckpoint 消息，会路由给相应的 Task 做处理</li>
-<li>Task 会起一个异步 task 进行 checkpoint，内部是调用 StreamTask 的 performCheckpoint 方法</li>
-<li>performCheckpoint 内部首先先将此次 checkpoint 的 barrier 广播到下游，以便让下游快速 checkpoint</li>
-<li>后执行具体的 checkpoint，将状态持久化，目前支持的持久化方式有：FileSystem、Memory、RocksDB，成功后通知 JobManager 进行 ack，否则取消此次 checkpoint</li>
-<li>如果是 ack 消息，依据具体情况通知对应的 KVState</li>
-</ul>
-<p>附一张图描述交互过程：</p>
-<p><img src="checkpoint-event-flow.png" alt="checkpoint-event-flow.png"></p>
-<h3 id="Checkpoint-的存储和恢复"><a href="#Checkpoint-的存储和恢复" class="headerlink" title="Checkpoint 的存储和恢复"></a>Checkpoint 的存储和恢复</h3><p>Checkpoint 的存储和恢复均是通过 AbstractStateBackend 来完成，AbstractStateBackend 有三个实现类，FsStateBackend 是通过 HDFS 来存储 checkpoint 状态，继承关系如下：</p>
-<p><img src="state-backend-extend.png" alt="state-backend-extend.png"></p>
-<p><em>我们来看最常见的一种 FsStateBackend</em>，AbstractStateBackend 内部通过 State 来管理状态数据，依据状态数据的不同特性，状态分为三种：</p>
-<ul>
-<li>ValueState ：最简单的状态，一个 key 一个单值 value，可以跟更新和删除</li>
-<li>ListState：一个 key 对应一个 value list</li>
-<li>ReducingState：一个 key 对应的 value 可以进行 reduce 操作</li>
-<li>FoldingState：一个key，后续添加的值都会通过 folding 函数附加到第一个值上</li>
-</ul>
-<p>AbstractStateBackend 内部通过 KvState 接口来管理用户自定义的 kv 数据，我们来看 FsValueState 的继承关系：</p>
-<p><img src="value-state-extend.png" alt="value-state-extend.png"></p>
-<p>那么如何获取这些 State 呢？flink 抽象了另一套接口：StateDescriptor 来获取 State，通过绑定特定的 StateBackend 来获取。这样一层抽象，解耦了 State 的类型和底层的具体的存储实现。我们来看 StateDescriptor 的继承关系：</p>
-<p><img src="state-describtor.png" alt="state-describtor.png"></p>
-<p>那么这些抽象是如何协调工作的呢？</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//KvState 的初始化和获取</span></div><div class="line"><span class="comment">//AbstractKeyedCEPPatternOperator line93</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">open</span><span class="params">()</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">if</span> (keys == <span class="keyword">null</span>) &#123;</div><div class="line">			keys = <span class="keyword">new</span> HashSet&lt;&gt;();</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (nfaOperatorState == <span class="keyword">null</span>) &#123;</div><div class="line">			nfaOperatorState = getPartitionedState(</div><div class="line">					<span class="keyword">new</span> ValueStateDescriptor&lt;NFA&lt;IN&gt;&gt;(</div><div class="line">						NFA_OPERATOR_STATE_NAME,</div><div class="line">						<span class="keyword">new</span> NFA.Serializer&lt;IN&gt;(),</div><div class="line">						<span class="keyword">null</span>));</div><div class="line">		&#125;</div><div class="line"></div><div class="line"><span class="comment">//AbstractStreamOperator line273</span></div><div class="line"><span class="keyword">protected</span> &lt;S extends State&gt; <span class="function">S <span class="title">getPartitionedState</span><span class="params">(StateDescriptor&lt;S, ?&gt; stateDescriptor)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="keyword">return</span> getStateBackend().getPartitionedState(<span class="keyword">null</span>, VoidSerializer.INSTANCE, stateDescriptor);</div><div class="line">	&#125;</div><div class="line"></div><div class="line"><span class="comment">//AbstractStateBackend line205</span></div><div class="line"><span class="comment">//具体的 kvState 由子类具体实现来决定</span></div><div class="line"><span class="keyword">public</span> &lt;N, S extends State&gt; <span class="function">S <span class="title">getPartitionedState</span><span class="params">(<span class="keyword">final</span> N namespace, <span class="keyword">final</span> TypeSerializer&lt;N&gt; namespaceSerializer, <span class="keyword">final</span> StateDescriptor&lt;S, ?&gt; stateDescriptor)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (keySerializer == <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"State key serializer has not been configured in the config. "</span> +</div><div class="line">					<span class="string">"This operation cannot use partitioned state."</span>);</div><div class="line">		&#125;</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (!stateDescriptor.isSerializerInitialized()) &#123;</div><div class="line">			stateDescriptor.initializeSerializerUnlessSet(<span class="keyword">new</span> ExecutionConfig());</div><div class="line">		&#125;</div><div class="line"><span class="comment">//获取 KvState 后，用户经过一番更新...下面是快照的过程</span></div><div class="line"><span class="comment">// StateBackend 的创建</span></div><div class="line"><span class="comment">//AbstractStreamOperator line114</span></div><div class="line"><span class="keyword">try</span> &#123;</div><div class="line">			TypeSerializer&lt;Object&gt; keySerializer = config.getStateKeySerializer(getUserCodeClassloader());</div><div class="line">			<span class="comment">// if the keySerializer is null we still need to create the state backend</span></div><div class="line">			<span class="comment">// for the non-partitioned state features it provides, such as the state output streams</span></div><div class="line">			String operatorIdentifier = getClass().getSimpleName() + <span class="string">"_"</span> + config.getVertexID() + <span class="string">"_"</span> + runtimeContext.getIndexOfThisSubtask();</div><div class="line">			stateBackend = container.createStateBackend(operatorIdentifier, keySerializer);</div><div class="line">		&#125; <span class="keyword">catch</span> (Exception e) &#123;</div><div class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"Could not initialize state backend. "</span>, e);</div><div class="line">		&#125;</div><div class="line"><span class="comment">//StreamTask line102</span></div><div class="line"><span class="function"><span class="keyword">public</span> AbstractStateBackend <span class="title">createStateBackend</span><span class="params">(String operatorIdentifier, TypeSerializer&lt;?&gt; keySerializer)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		AbstractStateBackend stateBackend = configuration.getStateBackend(userClassLoader);</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (stateBackend != <span class="keyword">null</span>) &#123;</div><div class="line">			<span class="comment">// backend has been configured on the environment</span></div><div class="line">			LOG.info(<span class="string">"Using user-defined state backend: "</span> + stateBackend);</div><div class="line">		&#125;</div><div class="line"><span class="comment">//快照入口</span></div><div class="line"><span class="comment">//AbstractStreamOperator line179</span></div><div class="line"><span class="function"><span class="keyword">public</span> StreamTaskState <span class="title">snapshotOperatorState</span><span class="params">(<span class="keyword">long</span> checkpointId, <span class="keyword">long</span> timestamp)</span> <span class="keyword">throws</span> Exception </span>&#123;</div><div class="line">		<span class="comment">// here, we deal with key/value state snapshots</span></div><div class="line"></div><div class="line">		StreamTaskState state = <span class="keyword">new</span> StreamTaskState();</div><div class="line"></div><div class="line">		<span class="keyword">if</span> (stateBackend != <span class="keyword">null</span>) &#123;</div><div class="line">			HashMap&lt;String, KvStateSnapshot&lt;?, ?, ?, ?, ?&gt;&gt; partitionedSnapshots =</div><div class="line">				stateBackend.snapshotPartitionedState(checkpointId, timestamp);</div><div class="line">			<span class="keyword">if</span> (partitionedSnapshots != <span class="keyword">null</span>) &#123;</div><div class="line">				state.setKvStates(partitionedSnapshots);</div><div class="line">			&#125;</div><div class="line">		&#125;</div><div class="line">		<span class="keyword">return</span> state;</div><div class="line">	&#125;</div></pre></td></tr></table></figure>
-<p>上面的快照之行结束后，用户会获取 KvStateSnapshot 抽象，对于 FsState 来说，起内部封装了文件句柄以及序列化元数据等信息，同时提供了恢复快照的接口，其抽象关系如下：</p>
-<p><img src="fs-snapshort-extend.png" alt="fs-snapshort-extend.png"></p>
-<p>flink  进一步将每个 task 的每个 operator 快照后获取的 KvStateSnapshot 封装成 StreamTaskState，并最终获取一个 StreamTaskState List【对应一个 task 的一组 operators】，分装成 StreamTaskStateList，随后通知 JobManager 的 CheckpointCoordinator：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="comment">//RuntimeEnvironment line260</span></div><div class="line">AcknowledgeCheckpoint message = <span class="keyword">new</span> AcknowledgeCheckpoint(</div><div class="line">				jobId,</div><div class="line">				executionId,</div><div class="line">				checkpointId,</div><div class="line">				serializedState,</div><div class="line">				stateSize);</div><div class="line"></div><div class="line">		jobManager.tell(message);</div></pre></td></tr></table></figure>
-<p>JobManager  再将这些句柄的数据再快照到本地和zk，具体见 JobManager 基本组件。恢复的过程是逆向的，暂时就不分析了，有耐心的用户可以自行查看源码!</p>
+<h2 id="CheckPoint"><a href="#CheckPoint" class="headerlink" title="CheckPoint"></a>CheckPoint</h2><p>已经迁移到 Flink-分布式快照的设计-流程</p>
 ]]></content>
     </entry>
     

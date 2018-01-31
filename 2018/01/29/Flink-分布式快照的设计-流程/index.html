@@ -70,7 +70,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="Flink内部实现," />
 
 
 
@@ -83,18 +83,20 @@
 
 
 
-<meta name="description" content="关于 Email: 我的邮箱 Github: 我的Github 微博: 我的微博">
-<meta property="og:type" content="website">
-<meta property="og:title" content="玉兆的博客">
-<meta property="og:url" content="https://danny0405.github.io/about/index.html">
+<meta name="description" content="在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Flink-分布式快照的设计-流程">
+<meta property="og:url" content="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/index.html">
 <meta property="og:site_name" content="玉兆的博客">
-<meta property="og:description" content="关于 Email: 我的邮箱 Github: 我的Github 微博: 我的微博">
-<meta property="og:image" content="https://danny0405.github.io/about/index/me.png">
-<meta property="og:updated_time" content="2017-02-06T13:52:53.000Z">
+<meta property="og:description" content="在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统">
+<meta property="og:image" content="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg">
+<meta property="og:image" content="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/stream_aligning.svg">
+<meta property="og:image" content="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/flink_ckp_flow.png">
+<meta property="og:updated_time" content="2018-01-31T05:21:01.516Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="玉兆的博客">
-<meta name="twitter:description" content="关于 Email: 我的邮箱 Github: 我的Github 微博: 我的微博">
-<meta name="twitter:image" content="https://danny0405.github.io/about/index/me.png">
+<meta name="twitter:title" content="Flink-分布式快照的设计-流程">
+<meta name="twitter:description" content="在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统">
+<meta name="twitter:image" content="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg">
 
 
 
@@ -124,13 +126,13 @@
 
 
 
-  <link rel="canonical" href="https://danny0405.github.io/about/"/>
+  <link rel="canonical" href="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/"/>
 
 
 
 
 
-  <title> | 玉兆的博客</title>
+  <title>Flink-分布式快照的设计-流程 | 玉兆的博客</title>
   
 
 
@@ -308,35 +310,361 @@
 
   <div id="posts" class="posts-expand">
     
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="chenyuzhao">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.png">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="玉兆的博客">
+    </span>
+
     
-    
-    <div class="post-block page">
       <header class="post-header">
 
-	<h1 class="post-title" itemprop="name headline"></h1>
-
-
-
-</header>
-
-      
-      
-      
-      <div class="post-body">
         
         
-          <p><img src="/about/index/me.png" alt=""></p>
-<h2 id="关于"><a href="#关于" class="headerlink" title="关于"></a>关于</h2><p><i class="fa fa-envelope"></i> Email: <a href="mailto:chenyuzhao@meituan.com" target="_blank" rel="external">我的邮箱</a><br><i class="fa fa-github"></i> Github: <a href="https://github.com/danny0405" target="_blank" rel="external">我的Github</a><br><i class="fa fa-weibo"></i> 微博: <a href="http://weibo.com/u/1600095407?refer_flag=1005055010_&amp;is_all=1" target="_blank" rel="external">我的微博</a></p>
-
+          <h1 class="post-title" itemprop="name headline">Flink-分布式快照的设计-流程</h1>
         
-      </div>
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2018-01-29T11:41:43+08:00">
+                2018-01-29
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Flink源码/" itemprop="url" rel="index">
+                    <span itemprop="name">Flink源码</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                <span class="post-meta-divider">|</span>
+                <span class="post-meta-item-icon">
+                  <i class="fa fa-comment-o"></i>
+                </span>
+                <a href="/2018/01/29/Flink-分布式快照的设计-流程/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count disqus-comment-count"
+                        data-disqus-identifier="2018/01/29/Flink-分布式快照的设计-流程/" itemprop="commentCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+          
+             <span id="/2018/01/29/Flink-分布式快照的设计-流程/" class="leancloud_visitors" data-flag-title="Flink-分布式快照的设计-流程">
+               <span class="post-meta-divider">|</span>
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               
+                 <span class="post-meta-item-text">阅读次数&#58;</span>
+               
+                 <span class="leancloud-visitors-count"></span>
+             </span>
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
       
       
+
+      
+        <p>在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br><a id="more"></a><br>JobManager 统一通知 source operator 发射 barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】：下游算子收到了它所有的 InputChannel 的 barrier 事件后，它便知道上游算子的一次 checkpoint 已完成，自己也可以做 checkpoint 了，checkpoint 之后继续将 checkpoint 事件广播到下游算子。</p>
+<p>在 exactly-once 语义下，消费端会延迟处理，对齐不同 channel 的 barrier，这在【Flink 网络栈】一文有详细介绍！<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_aligning.svg" alt="stream_aligning" title="stream_aligning"></p>
+<h3 id="Checkpoint-的协调与发起"><a href="#Checkpoint-的协调与发起" class="headerlink" title="Checkpoint 的协调与发起"></a>Checkpoint 的协调与发起</h3><p>Checkpoint 统一由 JobManager 发起，中间涉及到 JobManager 和 TaskManager 的交互，一轮快照可以分为 4 个阶段：</p>
+<ul>
+<li>JobManager checkpoint 的发起</li>
+<li>barrier 的逐级传播</li>
+<li>op/task 的 checkpint 以及 ack 消息回传</li>
+<li>JobManager commit 消息的广播</li>
+</ul>
+<p>整体的交互过程见下图：<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/flink_ckp_flow.png" alt="flink_ckp_flow" title="flink_ckp_flow"></p>
+<h3 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h3><p>Checkpoint 统一由 JobManager 发起，其中的核心抽象是 <code>CheckpointCoordinator</code>，它主要负责协调各个 op/task 的分布式快照，功能主要包括两部分：</p>
+<hr>
+<ol>
+<li>发起 checkpoint 事件消息给 task/op 并收取 checkpoint ack 信息</li>
+<li>维护 task/op 上报的 checkpoint ack 消息中附带的状态句柄 state-handle 的全局视图</li>
+</ol>
+<hr>
+<p>CheckpointCoordinator 可以同时并发执行多个 checkpoint，发起并尚未完全 ack 的 checkpint 被抽象为 <code>PendingCheckpoint</code>，当一个 <code>PendingCheckpoint</code> 被完全 ack 后即可转化一个 <code>CompletedCheckpoint</code>，一个 <code>CompletedCheckpoint</code> 代表一轮成功的分布式快照，并且该抽象可以拿来在 JobManager 端备份做高可用容错策略。</p>
+<p>由于一次发起的分布式快照并不一定执行的顺利【快速的执行完】，会出现各种异常情况，比如执行耗时导致后面发起的快照已执行完而自己却还没有结束、比如整体快照效率低下导致快照任务排队、比如快照期间发生了异常等。CheckpointCoordinator 就是扮演了从 checkpoint 发起到完全结束的整个生命周期的状态、策略协调的作用。</p>
+<h4 id="Checkpoint-属性控制"><a href="#Checkpoint-属性控制" class="headerlink" title="Checkpoint 属性控制"></a>Checkpoint 属性控制</h4><p>CheckpointProperties 包含 8 项属性，只介绍其中 4 项：</p>
+<hr>
+<ol>
+<li>forced：是否是强制，用户指定或者 savepoint 属性为 true</li>
+<li>externalize：是否是外部，savepoint 和 FS 快照为 true</li>
+<li>savepoint：是否是 savepoint</li>
+<li>subsumed：是否已经被包含了，如果比此快照 ckp1 更新的一个 ckp2 成功完成，那么 ckp1 就被称作 subsumed</li>
+</ol>
+<hr>
+<h4 id="CheckPoint-trig-策略"><a href="#CheckPoint-trig-策略" class="headerlink" title="CheckPoint trig 策略"></a>CheckPoint trig 策略</h4><p>对于一般的 checkpoint 来说，CheckpointCoordinator 会不断发起定时任务，触发主动的 checkpint 动作，是非强制的；但对于 savepoint 来说，是一次性的，强制执行的。每轮快照发起的基本策略如下：</p>
+<hr>
+<ol>
+<li>基本的合法性检查：以下情况将取消 checkpoint:<ul>
+<li>CheckpointCoordinator 已 shutdown</li>
+<li>scheduling 取消则停止接受 timer-task</li>
+<li>如果不是强制 checkpoint 并且在排队的 checkpoint 已超过最大限制数</li>
+<li>本次 checkpoint 的时间距离上次成功 checkpoint 的时间大于最小限制</li>
+<li>并不是所有需要 trigger 的 task 都是 RUNNING 状态</li>
+<li>并不是需要 ack 的 task 都是 RUNNING 状态</li>
+<li>获取本次全局递增的 checkpointID 失败</li>
+</ul>
+</li>
+<li>生成中间状态 PendingCheckpoint 并维护到内存映射关系中 checkpointID -&gt; PendingCheckpoint</li>
+<li>遍历所有需要 trigger 的 task 并依次发起 trigger checkpoint request</li>
+<li>如果本次 checkpint 耗费时间超过最大限制，则取消</li>
+<li>若以上发生任何异常，都将取消本次 checkpint</li>
+</ol>
+<hr>
+<h4 id="CheckPoint-ack-策略"><a href="#CheckPoint-ack-策略" class="headerlink" title="CheckPoint ack 策略"></a>CheckPoint ack 策略</h4><p>在 op/task 完成一次状态 checkpint 后便会将快照句柄以 ack 消息的形式发送给 CheckpointCoordinator，后者会维护这一轮快照的全局状态视图，具体的 ack 策略如下：</p>
+<hr>
+<ol>
+<li>从 ack 消息中拿到 checkpointID，并从缓存中取出对应的 checkpoint- ckp1</li>
+<li>若 ckp1 存在，则 <em>执行</em> ckp1 的ack：<code>PendingCheckpoint::acknowledgeTask</code>，会得到 4 种不同的结果：<ul>
+<li>SUCCESS： check ckp1 中所有需要 ack 的 task 是否都已收到 ack 消息，满足则执行以下操作：<ul>
+<li>将 PendingCheckpoint <em>转换为</em> CompletedCheckpoint- cckp1</li>
+<li>如果 cckp1 不是 savepoint，则 <em>存储到</em> CompletedCheckpointStore；并且将 checkpoint 时间早于 cckp1 的 PendingCheckpoint 取消掉</li>
+<li>将 ckp1 从缓存中清除，并立即出发一次 checkpoint scheduling timer-task 的重新调度</li>
+<li>编译所有的 ack executions 列表并发送 ack 完成的消息</li>
+</ul>
+</li>
+<li>DUPLICATE：ack 消息重复接收，直接忽略</li>
+<li>UNKNOWN：未知的 ack 消息，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+<li>DISCARDED： ckp1 已经被 discard，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+</ul>
+</li>
+<li>若 ckp1 存在但是已经被 discard，抛异常</li>
+<li>若 ckp1 不存在，将清理对应的 上报 task 此次的 snapshort 句柄</li>
+</ol>
+<hr>
+<h4 id="trig-ack-commit-节点策略"><a href="#trig-ack-commit-节点策略" class="headerlink" title="trig/ack/commit 节点策略"></a>trig/ack/commit 节点策略</h4><p>既然是快照的 trig/ack 那么就需要一个确定 trig/ack/commit JobVertex 节点的策略，这段策略封装在 <code>StreamingJobGraphGenerator</code>中，具体见下面的代码逻辑：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">  <span class="keyword">for</span> (JobVertex vertex : jobVertices.values()) &#123;</div><div class="line">	<span class="keyword">if</span> (vertex.isInputVertex()) &#123;</div><div class="line">		triggerVertices.add(vertex.getID());</div><div class="line">	&#125;</div><div class="line">	commitVertices.add(vertex.getID());</div><div class="line">	ackVertices.add(vertex.getID());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>可以看到，输入源 JobVertex 是 checkpoint 的发起节点，所有的节点都是接收 ack/commit 消息的节点。</p>
+<h3 id="CheckPoint-中间状态-PendingCheckpoint"><a href="#CheckPoint-中间状态-PendingCheckpoint" class="headerlink" title="CheckPoint 中间状态 PendingCheckpoint"></a>CheckPoint 中间状态 PendingCheckpoint</h3><p>PendingCheckpoint 代表一个已经发起，但尚未收到所有需要 ack task ack 消息的 ckeckpoint，一旦所有的 ack 消息都已收到，它就可以转化为一个 CompletedCheckpoint。</p>
+<h4 id="Task-ack-消息的维护"><a href="#Task-ack-消息的维护" class="headerlink" title="Task ack 消息的维护"></a>Task ack 消息的维护</h4><p>首先要说明的是：因为多个 op 可能组合成一个 chained-op 在该 task 中执行，PendingCheckpoint 收到的每条 ack 消息中的 task 快照：<code>TaskStateSnapshot</code> 包含了一个 op/task 中多个 op 实例的快照 <code>OperatorSubtaskState</code> 句柄，为了维护 ack 完成情况，PendingCheckpoint 内部包含了三个映射关系：</p>
+<hr>
+<ol>
+<li>需要 ack 但是尚未收到 ack 消息的 task 物理计划映射：ExecutionAttemptID -&gt; ExecutionVertex/map1</li>
+<li>已经收到 ack 消息的 task 物理计划映射：ExecutionAttemptID -&gt; ExecutionVertex/map2</li>
+<li>算子 ID 和算子状态的映射：OperatorID -&gt; OperatorState</li>
+</ol>
+<hr>
+<p>每次收到 ack 消息中的 <code>TaskStateSnapshot</code> ，其实就是完善 OperatorID -&gt; OperatorState 的过程，当 map1 为空集时就代表这个快照所有需要 ack 的 task 都收到了 ack 消息，也就是可以转换为 CompletedCheckpoint。</p>
+<h4 id="转化为-CompletedCheckpoint"><a href="#转化为-CompletedCheckpoint" class="headerlink" title="转化为 CompletedCheckpoint"></a>转化为 CompletedCheckpoint</h4><p>PendingCheckpoint 转化为 CompletedCheckpoint 后就可以在 JobManager 端做容错策略了，转化的具体策略：</p>
+<ol>
+<li>如果是 savepoint 或者用户指定了外部 checkpoint 的目录，则首先生成<br><code>new SavepointV2(checkpointId, operatorStates.values(), masterState);</code> 并快照到文件系统</li>
+<li>在内存中转化为 CompletedCheckpoint 并返回</li>
+</ol>
+<h3 id="CompletedCheckpoint-JobManager-端持久化"><a href="#CompletedCheckpoint-JobManager-端持久化" class="headerlink" title="CompletedCheckpoint JobManager 端持久化"></a>CompletedCheckpoint JobManager 端持久化</h3><p><em>这里我们只看高可用模式下的情形</em><br>一个 CompletedCheckpoint 代表一次成功的分布式快照，为了后续的快照恢复，在 JobManager 端需要将 CompletedCheckpoint 对象持久化。在高可用模式下的策略是将 CompletedCheckpoint 对象序列化写出到文件系统，拿到一个文件句柄后再将该文件句柄写到 zk 做 HA 等高可用策略。</p>
+<p>高可用模式下使用 <code>ZooKeeperCompletedCheckpointStore</code> 存储 CompletedCheckpoint，存储的逻辑如下：</p>
+<hr>
+<ol>
+<li>先将 CompletedCheckpoint instance 序列化后写入到 FS 中</li>
+<li>将 1 中的文件句柄写入 zookeeper 中，对于一个 Job 来说，可以写入的句柄数量是有限值 N，当快照数量超过 N 之后将会把最旧的快照句柄从 zookeeper 删除【相应的分布式快照的状态也会被清理】，再写入最新的快照</li>
+<li>恢复时将会从 2 中的最新一次 checkpint 恢复</li>
+</ol>
+<hr>
+<h3 id="TaskManager-端-checkpoint"><a href="#TaskManager-端-checkpoint" class="headerlink" title="TaskManager 端 checkpoint"></a>TaskManager 端 checkpoint</h3><p>在 CheckpointCoordinator 发起一次 checkpint 的 trig 之后，TaskManager 会收到消息：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">actorGateway.tell(<span class="keyword">new</span> TriggerCheckpoint(jobId, executionAttemptID, checkpointId, timestamp, checkpointOptions));</div></pre></td></tr></table></figure></p>
+<p>TaskManager 通过 executionAttemptID 拿到对应的 <code>Task</code> 并触发 checkpint barrier 传播，这段逻辑在 <code>StreamTask</code> 中，我们看一下其中的小细节：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// Since both state checkpointing and downstream barrier emission occurs in this</span></div><div class="line"><span class="comment">// lock scope, they are an atomic operation regardless of the order in which they occur.</span></div><div class="line"><span class="comment">// Given this, we immediately emit the checkpoint barriers, so the downstream operators</span></div><div class="line"><span class="comment">// can start their checkpoint work as soon as possible</span></div><div class="line">operatorChain.broadcastCheckpointBarrier(</div><div class="line">    checkpointMetaData.getCheckpointId(),</div><div class="line">    checkpointMetaData.getTimestamp(),</div><div class="line">    checkpointOptions);</div><div class="line"></div><div class="line">checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);</div></pre></td></tr></table></figure></p>
+<p>这里 Flink 会先广播 barrier 后执行本 task 的 checkpint，广播的对象是 <code>CheckpointBarrier</code>，它继承自 <code>RuntimeEvent</code>。<br><code>CheckpointBarrier</code> 中封装了三个参数：</p>
+<hr>
+<ol>
+<li>checkpointID： 逐次递增的 checkpint 序列号</li>
+<li>timestamp：checkpoint 对应的时间戳</li>
+<li>checkpointOptions：checkpint 附带属性</li>
+</ol>
+<hr>
+<p>我们在【Flink 网络栈】中有介绍，下游的消息接收统一经过 <code>StreamInputProcessor</code>，而其中的 <code>BarrierBuffer</code> 会依据 barrier block input-channel，直到所有的 input-channel 都收到了某个 checkpint 对应的 barrier。为了避免死锁，<code>BarrierBuffer</code> 并不会 block 数据的接收，而是会 cache 到机器的 buffer-cache 或磁盘上，只是 block 数据的算子处理。</p>
+<p>当 <code>BarrierBuffer</code> 的 block 释放后，便会触发背后的 op-task 进行 checkpint。</p>
+<p>op/task 快照结束后，会发送一条 ack 消息给 JobManager。</p>
+<h3 id="Checkpoint-的恢复"><a href="#Checkpoint-的恢复" class="headerlink" title="Checkpoint 的恢复"></a>Checkpoint 的恢复</h3><p>CheckPoint 的恢复伴随着 op/task 的恢复过程，在 CheckpointCoordinator 中，首先将 CompletedCheckpointStore 从之前的快照中恢复过来，拿到最新的一次 CompletedCheckpoint，并将各个算子的快照状态 <code>OperatorSubtaskState</code> 应用到 ExecutionVertex 的当前 Execution 中。</p>
+<p>后伴随着 <code>TaskDeploymentDescriptor</code> 一起下发到对应的 <code>TaskManager</code>，<code>TaskManager</code> 在启动分配的 task 时会应用对应的快照句柄进行状态恢复。</p>
+
       
     </div>
     
     
     
+
+    
+
+    
+      <div>
+        <div style="padding: 10px 0; margin: 20px auto; width: 90%; text-align: center;">
+  <div>生活不止眼前的苟且！</div>
+  <button id="rewardButton" disable="enable" onclick="var qr = document.getElementById('QR'); if (qr.style.display === 'none') {qr.style.display='block';} else {qr.style.display='none'}">
+    <span>打赏</span>
+  </button>
+  <div id="QR" style="display: none;">
+
+    
+      <div id="wechat" style="display: inline-block">
+        <img id="wechat_qr" src="/images/wechat-reward-image.png" alt="chenyuzhao 微信支付"/>
+        <p>微信支付</p>
+      </div>
+    
+
+    
+
+    
+
+  </div>
+</div>
+
+      </div>
+    
+
+    
+      <div>
+        <ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者：</strong>
+    chenyuzhao
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/" title="Flink-分布式快照的设计-流程">https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>
+    本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/" rel="external nofollow" target="_blank">CC BY-NC-SA 3.0</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+
+      </div>
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Flink内部实现/" rel="tag"># Flink内部实现</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/12/24/Flink-分布式快照的设计-存储/" rel="next" title="Flink 分布式快照的设计-存储">
+                <i class="fa fa-chevron-left"></i> Flink 分布式快照的设计-存储
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+<span class="jiathis_txt">分享到：</span>
+<a class="jiathis_button_tsina">新浪微博</a>
+<a class="jiathis_button_weixin">微信</a>
+<a class="jiathis_button_twitter">Twitter</a>
+<a class="jiathis_button_fb">Facebook</a>
+<a href="http://www.jiathis.com/share?uid=2140465" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank">更多</a>
+<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+var jiathis_config={
+  data_track_clickback:true,
+  summary:"",
+  shortUrl:false,
+  hideMore:false
+}
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=2155360" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
   </div>
 
 
@@ -486,7 +814,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#关于"><span class="nav-number">1.</span> <span class="nav-text">关于</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Checkpoint-的协调与发起"><span class="nav-number">1.</span> <span class="nav-text">Checkpoint 的协调与发起</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CheckpointCoordinator"><span class="nav-number">2.</span> <span class="nav-text">CheckpointCoordinator</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Checkpoint-属性控制"><span class="nav-number">2.1.</span> <span class="nav-text">Checkpoint 属性控制</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CheckPoint-trig-策略"><span class="nav-number">2.2.</span> <span class="nav-text">CheckPoint trig 策略</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CheckPoint-ack-策略"><span class="nav-number">2.3.</span> <span class="nav-text">CheckPoint ack 策略</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#trig-ack-commit-节点策略"><span class="nav-number">2.4.</span> <span class="nav-text">trig/ack/commit 节点策略</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CheckPoint-中间状态-PendingCheckpoint"><span class="nav-number">3.</span> <span class="nav-text">CheckPoint 中间状态 PendingCheckpoint</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Task-ack-消息的维护"><span class="nav-number">3.1.</span> <span class="nav-text">Task ack 消息的维护</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#转化为-CompletedCheckpoint"><span class="nav-number">3.2.</span> <span class="nav-text">转化为 CompletedCheckpoint</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CompletedCheckpoint-JobManager-端持久化"><span class="nav-number">4.</span> <span class="nav-text">CompletedCheckpoint JobManager 端持久化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#TaskManager-端-checkpoint"><span class="nav-number">5.</span> <span class="nav-text">TaskManager 端 checkpoint</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Checkpoint-的恢复"><span class="nav-number">6.</span> <span class="nav-text">Checkpoint 的恢复</span></a></li></ol></div>
             
 
           </div>
@@ -649,9 +977,9 @@
     
       <script type="text/javascript">
         var disqus_config = function () {
-          this.page.url = 'https://danny0405.github.io/about/index.html';
-          this.page.identifier = 'about/index.html';
-          this.page.title = '';
+          this.page.url = 'https://danny0405.github.io/2018/01/29/Flink-分布式快照的设计-流程/';
+          this.page.identifier = '2018/01/29/Flink-分布式快照的设计-流程/';
+          this.page.title = 'Flink-分布式快照的设计-流程';
         };
         var d = document, s = d.createElement('script');
         s.src = 'https://danny0405.disqus.com/embed.js';
