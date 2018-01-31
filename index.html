@@ -432,7 +432,7 @@
 
       
         
-          <p>在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br>
+          <p>Flink 通过 barrier 来协调 checkpoint 的时机，我们在介绍【Flink 网络栈】的时候已经有介绍：对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br>
           <!--noindex-->
           <div class="post-button text-center">
             <a class="btn" href="/2018/01/29/Flink-分布式快照的设计-流程/#more" rel="contents">

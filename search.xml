@@ -6,7 +6,7 @@
     <entry>
       <title><![CDATA[Flink-分布式快照的设计-流程]]></title>
       <url>https://danny0405.github.io/2018/01/29/Flink-%E5%88%86%E5%B8%83%E5%BC%8F%E5%BF%AB%E7%85%A7%E7%9A%84%E8%AE%BE%E8%AE%A1-%E6%B5%81%E7%A8%8B/</url>
-      <content type="html"><![CDATA[<p>在 Flink 内部，CheckPoint 是通过 barrier 的方式来协调时机，我们在介绍【Flink 网络栈】的时候已经有介绍在消费端 Flink 对于不同的 barrier 处理，实际上，barrier 是用来校准 checkpint 时间的方式。对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，而 barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br><a id="more"></a><br>JobManager 统一通知 source operator 发射 barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】：下游算子收到了它所有的 InputChannel 的 barrier 事件后，它便知道上游算子的一次 checkpoint 已完成，自己也可以做 checkpoint 了，checkpoint 之后继续将 checkpoint 事件广播到下游算子。</p>
+      <content type="html"><![CDATA[<p>Flink 通过 barrier 来协调 checkpoint 的时机，我们在介绍【Flink 网络栈】的时候已经有介绍：对于一个拓扑结构，只有上游算子 checkpoint 完成，下游算子的 checkpoint 才能开始并有意义，又因为下游算子的消费速率并不统一【有的 channel 快，有的 channel 慢】，barrier 就是这样一种协调上下游算子的机制。<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_barriers.svg" alt="stream_barriers" title="stream_barriers"><br><a id="more"></a><br>JobManager 统一通知 source operator 发射 barrier 事件，并向下游广播，当下游算子收到这样的事件后，它就知道自己处于两次 checkpoint 之间【一次新的 checkpoint 将被发起】：下游算子 op-1 收到了它所有的 InputChannel 的某次 checkpint 的 barrier 事件后【意味着上游算子的一次 checkpoint 已完成】，自身也可以做 checkpoint，并且在 checkpoint 之后继续将 checkpoint 事件广播到 op-1 的下游算子。</p>
 <p>在 exactly-once 语义下，消费端会延迟处理，对齐不同 channel 的 barrier，这在【Flink 网络栈】一文有详细介绍！<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/stream_aligning.svg" alt="stream_aligning" title="stream_aligning"></p>
 <h3 id="Checkpoint-的协调与发起"><a href="#Checkpoint-的协调与发起" class="headerlink" title="Checkpoint 的协调与发起"></a>Checkpoint 的协调与发起</h3><p>Checkpoint 统一由 JobManager 发起，中间涉及到 JobManager 和 TaskManager 的交互，一轮快照可以分为 4 个阶段：</p>
 <ul>
@@ -16,14 +16,14 @@
 <li>JobManager commit 消息的广播</li>
 </ul>
 <p>整体的交互过程见下图：<br><img src="/2018/01/29/Flink-分布式快照的设计-流程/flink_ckp_flow.png" alt="flink_ckp_flow" title="flink_ckp_flow"></p>
-<h3 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h3><p>Checkpoint 统一由 JobManager 发起，其中的核心抽象是 <code>CheckpointCoordinator</code>，它主要负责协调各个 op/task 的分布式快照，功能主要包括两部分：</p>
+<h3 id="CheckpointCoordinator"><a href="#CheckpointCoordinator" class="headerlink" title="CheckpointCoordinator"></a>CheckpointCoordinator</h3><p>JobManager 中对 checkpoint 全局协调控制的核心抽象是 <code>CheckpointCoordinator</code>，它的功能主要包括两部分：</p>
 <hr>
 <ol>
-<li>发起 checkpoint 事件消息给 task/op 并收取 checkpoint ack 信息</li>
-<li>维护 task/op 上报的 checkpoint ack 消息中附带的状态句柄 state-handle 的全局视图</li>
+<li>发起起始 checkpoint trigger-event 消息给 op/task 并收取 op/task 完成该轮 checkpoint 之后的 ack 信息</li>
+<li>维护 op/task 上报的 ack 消息中附带的状态句柄：state-handle 的全局视图</li>
 </ol>
 <hr>
-<p>CheckpointCoordinator 可以同时并发执行多个 checkpoint，发起并尚未完全 ack 的 checkpint 被抽象为 <code>PendingCheckpoint</code>，当一个 <code>PendingCheckpoint</code> 被完全 ack 后即可转化一个 <code>CompletedCheckpoint</code>，一个 <code>CompletedCheckpoint</code> 代表一轮成功的分布式快照，并且该抽象可以拿来在 JobManager 端备份做高可用容错策略。</p>
+<p>CheckpointCoordinator 可以同时并发执行多个 checkpoint，一次发起并尚未完全 ack 的 checkpint 被抽象为 <code>PendingCheckpoint</code>，当 <code>PendingCheckpoint</code> 被完全 ack 后即可转化一个 <code>CompletedCheckpoint</code>，一个 <code>CompletedCheckpoint</code> 代表一轮成功的分布式快照，该抽象可以拿来在 JobManager 端备份做高可用容错策略。</p>
 <p>由于一次发起的分布式快照并不一定执行的顺利【快速的执行完】，会出现各种异常情况，比如执行耗时导致后面发起的快照已执行完而自己却还没有结束、比如整体快照效率低下导致快照任务排队、比如快照期间发生了异常等。CheckpointCoordinator 就是扮演了从 checkpoint 发起到完全结束的整个生命周期的状态、策略协调的作用。</p>
 <h4 id="Checkpoint-属性控制"><a href="#Checkpoint-属性控制" class="headerlink" title="Checkpoint 属性控制"></a>Checkpoint 属性控制</h4><p>CheckpointProperties 包含 8 项属性，只介绍其中 4 项：</p>
 <hr>
@@ -34,7 +34,7 @@
 <li>subsumed：是否已经被包含了，如果比此快照 ckp1 更新的一个 ckp2 成功完成，那么 ckp1 就被称作 subsumed</li>
 </ol>
 <hr>
-<h4 id="CheckPoint-trig-策略"><a href="#CheckPoint-trig-策略" class="headerlink" title="CheckPoint trig 策略"></a>CheckPoint trig 策略</h4><p>对于一般的 checkpoint 来说，CheckpointCoordinator 会不断发起定时任务，触发主动的 checkpint 动作，是非强制的；但对于 savepoint 来说，是一次性的，强制执行的。每轮快照发起的基本策略如下：</p>
+<h4 id="CheckPoint-trigger-策略"><a href="#CheckPoint-trigger-策略" class="headerlink" title="CheckPoint trigger 策略"></a>CheckPoint trigger 策略</h4><p>对于一般的 checkpoint 来说，CheckpointCoordinator 会不断发起定时任务，触发 checkpint 动作，是非强制、定时触发的；对于 savepoint 来说，快照是一次性的，强制执行的。每轮快照发起的基本策略如下：</p>
 <hr>
 <ol>
 <li>基本的合法性检查：以下情况将取消 checkpoint:<ul>
@@ -56,10 +56,10 @@
 <h4 id="CheckPoint-ack-策略"><a href="#CheckPoint-ack-策略" class="headerlink" title="CheckPoint ack 策略"></a>CheckPoint ack 策略</h4><p>在 op/task 完成一次状态 checkpint 后便会将快照句柄以 ack 消息的形式发送给 CheckpointCoordinator，后者会维护这一轮快照的全局状态视图，具体的 ack 策略如下：</p>
 <hr>
 <ol>
-<li>从 ack 消息中拿到 checkpointID，并从缓存中取出对应的 checkpoint- ckp1</li>
+<li>从 ack 消息中拿到 checkpointID，并从缓存中取出对应的 checkpoint：ckp1</li>
 <li>若 ckp1 存在，则 <em>执行</em> ckp1 的ack：<code>PendingCheckpoint::acknowledgeTask</code>，会得到 4 种不同的结果：<ul>
 <li>SUCCESS： check ckp1 中所有需要 ack 的 task 是否都已收到 ack 消息，满足则执行以下操作：<ul>
-<li>将 PendingCheckpoint <em>转换为</em> CompletedCheckpoint- cckp1</li>
+<li>将 PendingCheckpoint <em>转换为</em> CompletedCheckpoint：cckp1</li>
 <li>如果 cckp1 不是 savepoint，则 <em>存储到</em> CompletedCheckpointStore；并且将 checkpoint 时间早于 cckp1 的 PendingCheckpoint 取消掉</li>
 <li>将 ckp1 从缓存中清除，并立即出发一次 checkpoint scheduling timer-task 的重新调度</li>
 <li>编译所有的 ack executions 列表并发送 ack 完成的消息</li>
@@ -74,11 +74,11 @@
 <li>若 ckp1 不存在，将清理对应的 上报 task 此次的 snapshort 句柄</li>
 </ol>
 <hr>
-<h4 id="trig-ack-commit-节点策略"><a href="#trig-ack-commit-节点策略" class="headerlink" title="trig/ack/commit 节点策略"></a>trig/ack/commit 节点策略</h4><p>既然是快照的 trig/ack 那么就需要一个确定 trig/ack/commit JobVertex 节点的策略，这段策略封装在 <code>StreamingJobGraphGenerator</code>中，具体见下面的代码逻辑：</p>
+<h4 id="trigger-ack-commit-节点策略"><a href="#trigger-ack-commit-节点策略" class="headerlink" title="trigger/ack/commit 节点策略"></a>trigger/ack/commit 节点策略</h4><p>既然是快照的 trigger/ack 那么就需要一个确定 trigger/ack/commit JobVertex 节点的策略，这段策略封装在 <code>StreamingJobGraphGenerator</code>中，具体见下面的代码逻辑：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">  <span class="keyword">for</span> (JobVertex vertex : jobVertices.values()) &#123;</div><div class="line">	<span class="keyword">if</span> (vertex.isInputVertex()) &#123;</div><div class="line">		triggerVertices.add(vertex.getID());</div><div class="line">	&#125;</div><div class="line">	commitVertices.add(vertex.getID());</div><div class="line">	ackVertices.add(vertex.getID());</div><div class="line">&#125;</div></pre></td></tr></table></figure>
-<p>可以看到，输入源 JobVertex 是 checkpoint 的发起节点，所有的节点都是接收 ack/commit 消息的节点。</p>
-<h3 id="CheckPoint-中间状态-PendingCheckpoint"><a href="#CheckPoint-中间状态-PendingCheckpoint" class="headerlink" title="CheckPoint 中间状态 PendingCheckpoint"></a>CheckPoint 中间状态 PendingCheckpoint</h3><p>PendingCheckpoint 代表一个已经发起，但尚未收到所有需要 ack task ack 消息的 ckeckpoint，一旦所有的 ack 消息都已收到，它就可以转化为一个 CompletedCheckpoint。</p>
-<h4 id="Task-ack-消息的维护"><a href="#Task-ack-消息的维护" class="headerlink" title="Task ack 消息的维护"></a>Task ack 消息的维护</h4><p>首先要说明的是：因为多个 op 可能组合成一个 chained-op 在该 task 中执行，PendingCheckpoint 收到的每条 ack 消息中的 task 快照：<code>TaskStateSnapshot</code> 包含了一个 op/task 中多个 op 实例的快照 <code>OperatorSubtaskState</code> 句柄，为了维护 ack 完成情况，PendingCheckpoint 内部包含了三个映射关系：</p>
+<p>可以看到，输入源 JobVertex 是 checkpoint 的发起节点，而所有的节点都是接收 ack/commit 消息的节点。</p>
+<h3 id="CheckPoint-中间状态-PendingCheckpoint"><a href="#CheckPoint-中间状态-PendingCheckpoint" class="headerlink" title="CheckPoint 中间状态 PendingCheckpoint"></a>CheckPoint 中间状态 PendingCheckpoint</h3><p>PendingCheckpoint 代表一个已经发起，但尚未收到所有需要 ack-task ack 消息的 ckeckpoint，一旦所有的 ack 消息都已收到，它就可以转化为一个 CompletedCheckpoint。</p>
+<h4 id="Task-ack-消息的维护"><a href="#Task-ack-消息的维护" class="headerlink" title="Task ack 消息的维护"></a>Task ack 消息的维护</h4><p>首先要说明的是：因为多个 op 可能组合成一个 chained-op 在一个 task 中执行，PendingCheckpoint 收到的每条 ack 消息中的 task 快照：<code>TaskStateSnapshot</code> 包含了一个 op/task 中一个/多个 op 实例的快照句柄：<code>OperatorSubtaskState</code>，为了维护 ack 完成情况，PendingCheckpoint 内部包含了三个映射关系：</p>
 <hr>
 <ol>
 <li>需要 ack 但是尚未收到 ack 消息的 task 物理计划映射：ExecutionAttemptID -&gt; ExecutionVertex/map1</li>
@@ -87,13 +87,14 @@
 </ol>
 <hr>
 <p>每次收到 ack 消息中的 <code>TaskStateSnapshot</code> ，其实就是完善 OperatorID -&gt; OperatorState 的过程，当 map1 为空集时就代表这个快照所有需要 ack 的 task 都收到了 ack 消息，也就是可以转换为 CompletedCheckpoint。</p>
-<h4 id="转化为-CompletedCheckpoint"><a href="#转化为-CompletedCheckpoint" class="headerlink" title="转化为 CompletedCheckpoint"></a>转化为 CompletedCheckpoint</h4><p>PendingCheckpoint 转化为 CompletedCheckpoint 后就可以在 JobManager 端做容错策略了，转化的具体策略：</p>
+<h4 id="转化为-CompletedCheckpoint"><a href="#转化为-CompletedCheckpoint" class="headerlink" title="转化为 CompletedCheckpoint"></a>转化为 CompletedCheckpoint</h4><p>转化的具体策略：</p>
 <ol>
 <li>如果是 savepoint 或者用户指定了外部 checkpoint 的目录，则首先生成<br><code>new SavepointV2(checkpointId, operatorStates.values(), masterState);</code> 并快照到文件系统</li>
 <li>在内存中转化为 CompletedCheckpoint 并返回</li>
 </ol>
+<p>PendingCheckpoint 转化为 CompletedCheckpoint 后就可以在 JobManager 端持久化做容错策略了。</p>
 <h3 id="CompletedCheckpoint-JobManager-端持久化"><a href="#CompletedCheckpoint-JobManager-端持久化" class="headerlink" title="CompletedCheckpoint JobManager 端持久化"></a>CompletedCheckpoint JobManager 端持久化</h3><p><em>这里我们只看高可用模式下的情形</em><br>一个 CompletedCheckpoint 代表一次成功的分布式快照，为了后续的快照恢复，在 JobManager 端需要将 CompletedCheckpoint 对象持久化。在高可用模式下的策略是将 CompletedCheckpoint 对象序列化写出到文件系统，拿到一个文件句柄后再将该文件句柄写到 zk 做 HA 等高可用策略。</p>
-<p>高可用模式下使用 <code>ZooKeeperCompletedCheckpointStore</code> 存储 CompletedCheckpoint，存储的逻辑如下：</p>
+<p>高可用模式下使用 <code>ZooKeeperCompletedCheckpointStore</code> 存储 CompletedCheckpoint，存储的逻辑：</p>
 <hr>
 <ol>
 <li>先将 CompletedCheckpoint instance 序列化后写入到 FS 中</li>
@@ -101,7 +102,7 @@
 <li>恢复时将会从 2 中的最新一次 checkpint 恢复</li>
 </ol>
 <hr>
-<h3 id="TaskManager-端-checkpoint"><a href="#TaskManager-端-checkpoint" class="headerlink" title="TaskManager 端 checkpoint"></a>TaskManager 端 checkpoint</h3><p>在 CheckpointCoordinator 发起一次 checkpint 的 trig 之后，TaskManager 会收到消息：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">actorGateway.tell(<span class="keyword">new</span> TriggerCheckpoint(jobId, executionAttemptID, checkpointId, timestamp, checkpointOptions));</div></pre></td></tr></table></figure></p>
+<h3 id="TaskManager-端-checkpoint"><a href="#TaskManager-端-checkpoint" class="headerlink" title="TaskManager 端 checkpoint"></a>TaskManager 端 checkpoint</h3><p>在 CheckpointCoordinator 发起一次 checkpint 的 trigger 之后，TaskManager 会收到消息：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">actorGateway.tell(<span class="keyword">new</span> TriggerCheckpoint(jobId, executionAttemptID, checkpointId, timestamp, checkpointOptions));</div></pre></td></tr></table></figure></p>
 <p>TaskManager 通过 executionAttemptID 拿到对应的 <code>Task</code> 并触发 checkpint barrier 传播，这段逻辑在 <code>StreamTask</code> 中，我们看一下其中的小细节：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div></pre></td><td class="code"><pre><div class="line"><span class="comment">// Since both state checkpointing and downstream barrier emission occurs in this</span></div><div class="line"><span class="comment">// lock scope, they are an atomic operation regardless of the order in which they occur.</span></div><div class="line"><span class="comment">// Given this, we immediately emit the checkpoint barriers, so the downstream operators</span></div><div class="line"><span class="comment">// can start their checkpoint work as soon as possible</span></div><div class="line">operatorChain.broadcastCheckpointBarrier(</div><div class="line">    checkpointMetaData.getCheckpointId(),</div><div class="line">    checkpointMetaData.getTimestamp(),</div><div class="line">    checkpointOptions);</div><div class="line"></div><div class="line">checkpointState(checkpointMetaData, checkpointOptions, checkpointMetrics);</div></pre></td></tr></table></figure></p>
 <p>这里 Flink 会先广播 barrier 后执行本 task 的 checkpint，广播的对象是 <code>CheckpointBarrier</code>，它继承自 <code>RuntimeEvent</code>。<br><code>CheckpointBarrier</code> 中封装了三个参数：</p>
 <hr>
@@ -111,7 +112,7 @@
 <li>checkpointOptions：checkpint 附带属性</li>
 </ol>
 <hr>
-<p>我们在【Flink 网络栈】中有介绍，下游的消息接收统一经过 <code>StreamInputProcessor</code>，而其中的 <code>BarrierBuffer</code> 会依据 barrier block input-channel，直到所有的 input-channel 都收到了某个 checkpint 对应的 barrier。为了避免死锁，<code>BarrierBuffer</code> 并不会 block 数据的接收，而是会 cache 到机器的 buffer-cache 或磁盘上，只是 block 数据的算子处理。</p>
+<p>我们在【Flink 网络栈】中有介绍，下游的消息接收统一经过 <code>StreamInputProcessor</code>，而其中的 <code>BarrierBuffer</code> 会依据 barrier block/阻塞 input-channel，直到所有的 input-channel 都收到了某个 checkpint 对应的 barrier 才会释放 block。为了避免死锁，<code>BarrierBuffer</code> 并不会 block 数据的接收，而是会 cache 到机器的 buffer-cache 或磁盘上，只是 block 数据的算子处理。</p>
 <p>当 <code>BarrierBuffer</code> 的 block 释放后，便会触发背后的 op-task 进行 checkpint。</p>
 <p>op/task 快照结束后，会发送一条 ack 消息给 JobManager。</p>
 <h3 id="Checkpoint-的恢复"><a href="#Checkpoint-的恢复" class="headerlink" title="Checkpoint 的恢复"></a>Checkpoint 的恢复</h3><p>CheckPoint 的恢复伴随着 op/task 的恢复过程，在 CheckpointCoordinator 中，首先将 CompletedCheckpointStore 从之前的快照中恢复过来，拿到最新的一次 CompletedCheckpoint，并将各个算子的快照状态 <code>OperatorSubtaskState</code> 应用到 ExecutionVertex 的当前 Execution 中。</p>
